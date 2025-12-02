@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block page_title %}Official Business Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Total OB Requests</h5>
+                <h4 class="fw-semibold mb-2 fs-8">75</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Approved OBs</h5>
+                <h4 class="fw-semibold mb-2 fs-8">50</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Pending OBs</h5>
+                <h4 class="fw-semibold mb-2 fs-8">25</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- OB Management List -->
+<div class="row">
+    <div class="col-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">OB Management Quick Links</h5>
+                <!-- Quick Links in Tiles -->
+                <div class="row g-3">
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-file-earmark-plus fs-2 mb-2"></i>
+                                <div>Manage OB Requests</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-calendar-check fs-2 mb-2"></i>
+                                <div>Approve OBs</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-people fs-2 mb-2"></i>
+                                <div>OB Reports</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Recent OB Activities</h5>
+                <!-- Recent Activities List -->
+                <ul class="list-group">
+                    <li class="list-group-item">
+                        John Doe submitted an OB request.
+                    </li>
+                    <li class="list-group-item">
+                        Jane Smith's OB request was approved.
+                    </li>
+                    <li class="list-group-item">
+                        Mark Johnson viewed OB reports.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

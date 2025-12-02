@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block page_title %}Clock Correction Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Total CC Requests</h5>
+                <h4 class="fw-semibold mb-2 fs-8">45</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Approved CCs</h5>
+                <h4 class="fw-semibold mb-2 fs-8">30</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Pending CCs</h5>
+                <h4 class="fw-semibold mb-2 fs-8">15</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CC Management List -->
+<div class="row">
+    <div class="col-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">CC Management Quick Links</h5>
+                <!-- Quick Links in Tiles -->
+                <div class="row g-3">
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-clock-history fs-2 mb-2"></i>
+                                <div>Manage CC Requests</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-check2-square fs-2 mb-2"></i>
+                                <div>Approve CCs</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-people fs-2 mb-2"></i>
+                                <div>View CC History</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Recent Changes</h5>
+                <!-- Recent Activities List -->
+                <ul class="list-group">
+                    <li class="list-group-item">John Doe submitted a CC request.</li>
+                    <li class="list-group-item">Jane Smith's CC request was approved.</li>
+                    <li class="list-group-item">Mark Johnson's CC request is pending.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CC Management Section -->
+{% endblock %}

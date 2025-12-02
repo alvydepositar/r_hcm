@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block page_title %}Employee Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Total Employees</h5>
+                <h4 class="fw-semibold mb-2 fs-8">350</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Division Groups</h5>
+                <h4 class="fw-semibold mb-2 fs-8">15</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">HR Employees</h5>
+                <h4 class="fw-semibold mb-2 fs-8">10</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Management List -->
+<div class="row">
+    <div class="col-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Maintenance Links</h5>
+                <!-- Quick Links in Tiles -->
+                <div class="row g-3">
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-person-plus fs-2 mb-2"></i>
+                                <div>Manage Employee Information</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-building fs-2 mb-2"></i>
+                                <div>Manage Divisions</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-clock-history fs-2 mb-2"></i>
+                                <div>Manage Time Rules</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-briefcase fs-2 mb-2"></i>
+                                <div>Manage Positions</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-people fs-2 mb-2"></i>
+                                <div>Manage Salary Grade</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-calendar-check fs-2 mb-2"></i>
+                                <div>Manage Employee Salary</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-shield-lock fs-2 mb-2"></i>
+                                <div>Manage Access Rights</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Recent Changes</h5>
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        John Doe updated employee records.
+                        <span class="badge bg-primary rounded-pill">2 hrs ago</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Jane Smith added a new division.
+                        <span class="badge bg-primary rounded-pill">5 hrs ago</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Mike Johnson modified time rules.
+                        <span class="badge bg-primary rounded-pill">1 day ago</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Emily Davis updated salary grades.
+                        <span class="badge bg-primary rounded-pill">2 days ago</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Employee Management Section -->
+
+{% endblock %}

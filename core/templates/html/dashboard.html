@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- HR Dashboard-->
+<div id="hr-dashboard" > 
+    <div class="row">
+        <div class="col-4">
+            <div class="card overflow-hidden">
+                <div class="card-body">
+                    <h5 class="card-title mb-9 fs-4 fw-light">Total Employees</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">500</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="card overflow-hidden">
+                <div class="card-body">
+                    <h5 class="card-title mb-9 fs-4 fw-light">Pending Filings</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">5</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="card overflow-hidden">
+                <div class="card-body">
+                    <h5 class="card-title mb-9 fs-4 fw-light">For HR Approval</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">4</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filing Overview (Leave, Official Business, Clock Correction)-->
+    <div class="row">
+        <h5 class="card-title mb-4">Filing Overview</h5>
+
+        <!-- Leave Overview -->
+        <div class="col-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="card-title mb-0 fs-4 fw-light">
+                        <h5><i class="ti ti-calendar-event"></i> Leave Requests</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <tbody>
+                                <tr>
+                                    <td>Pending</td>
+                                    <td>120</td>
+                                </tr>
+                                <tr>
+                                    <td>For Supervisor Approval</td>
+                                    <td>15</td>
+                                </tr>
+                                <tr>
+                                    <td>For HR Approval</td>
+                                    <td>5</td>
+                                </tr>
+                                <tr>
+                                    <td>Approved</td>
+                                    <td>5</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Official Business Overview -->
+        <div class="col-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="card-title mb-0 fs-4 fw-light">
+                        <h5><i class="ti ti-briefcase"></i> Official Business Requests</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <tbody>
+                                <tr>
+                                    <td>Pending</td>
+                                    <td>80</td>
+                                </tr>
+                                <tr>
+                                    <td>For Supervisor Approval</td>
+                                    <td>10</td>
+                                </tr>
+                                <tr>
+                                    <td>For HR Approval</td>
+                                    <td>3</td>
+                                </tr>
+                                <tr>
+                                    <td>Approved</td>
+                                    <td>7</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clock Correction Overview -->
+        <div class="col-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="card-title mb-0 fs-4 fw-light">
+                        <h5><i class="ti ti-clock"></i> Clock Correction Requests</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <tbody>
+                                <tr>
+                                    <td>Pending</td>
+                                    <td>60</td>
+                                </tr>
+                                <tr>
+                                    <td>For Supervisor Approval</td>
+                                    <td>8</td>
+                                </tr>
+                                <tr>
+                                    <td>For HR Approval</td>
+                                    <td>2</td>
+                                </tr>
+                                <tr>
+                                    <td>Approved</td>
+                                    <td>5</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <h5 class="card-title mb-4">Recent Employee Filings</h5>
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Employee Name</th>
+                                    <th scope="col">Filing Type</th>
+                                    <th scope="col">Date Submitted</th>
+                                    <th scope="col">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>John Doe</td>
+                                    <td>Leave Application</td>
+                                    <td>2024-06-15</td>
+                                    <td><span class="badge bg-warning text-dark">Pending</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Jane Smith</td>
+                                    <td>Overtime Request</td>
+                                    <td>2024-06-14</td>
+                                    <td><span class="badge bg-success">Approved</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Mike Johnson</td>
+                                    <td>Expense Reimbursement</td>
+                                    <td>2024-06-13</td>
+                                    <td><span class="badge bg-danger">Rejected</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="employee-dashboard" style="display: none;">
+    <div class="row">
+        <div class="col-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4 fs-4 fw-light">Pending Leave Requests</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">10</h4>
+                </div>
+            </div>
+        </div>
+    
+        <div class="col-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4 fs-4 fw-light">Pending Official Business Requests</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">5</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4 fs-4 fw-light">Pending Clock Correction Requests</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">3</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4 fs-4 fw-light">Recent Filings</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Filing Type</th>
+                                    <th scope="col">Date Submitted</th>
+                                    <th scope="col">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Leave Application</td>
+                                    <td>2024-06-15</td>
+                                    <td><span class="badge bg-warning text-dark">Pending</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Official Business Request</td>
+                                    <td>2024-06-14</td>
+                                    <td><span class="badge bg-success">Approved</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Clock Correction Request</td>
+                                    <td>2024-06-13</td>
+                                    <td><span class="badge bg-danger">Rejected</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4 fs-4 fw-light">Recent DTR</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Date</th>
+                                    <th scope="col">Time In</th>
+                                    <th scope="col">Time Out</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>2024-06-15</td>
+                                    <td>08:00 AM</td>
+                                    <td>05:00 PM</td>
+                                </tr>
+                                <tr>
+                                    <td>2024-06-14</td>
+                                    <td>08:15 AM</td>
+                                    <td>05:10 PM</td>
+                                </tr>
+                                <tr>
+                                    <td>2024-06-13</td>
+                                    <td>08:05 AM</td>
+                                    <td>05:00 PM</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4 fs-4 fw-light">Leave Balance Overview</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Leave Type</th>
+                                    <th scope="col">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Vacation Leave</td>
+                                    <td>10 Days</td>
+                                </tr>
+                                <tr>
+                                    <td>Sick Leave</td>
+                                    <td>5 Days</td>
+                                </tr>
+                                <tr>
+                                    <td>Emergency Leave</td>
+                                    <td>3 Days</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4 fs-4 fw-light">Approvers</h5>
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Immediate Supervisor
+                            <span>John Supervisor</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Division Chief
+                            <span>Mary Chief</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            HR Manager
+                            <span>Jane HR</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block page_title %}Leave Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Total Leave Requests</h5>
+                <h4 class="fw-semibold mb-2 fs-8">120</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Approved Leaves</h5>
+                <h4 class="fw-semibold mb-2 fs-8">85</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card overflow-hidden">
+            <div class="card-body">
+                <h5 class="card-title mb-9 fs-4 fw-light">Pending Leaves</h5>
+                <h4 class="fw-semibold mb-2 fs-8">35</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leave Management List -->
+<div class="row">
+    <div class="col-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Leave Management Quick Links</h5>
+                <!-- Quick Links in Tiles -->
+                <div class="row g-3">
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-check2-square fs-2 mb-2"></i>
+                                <div>Approve Leaves</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-calendar-plus fs-2 mb-2"></i>
+                                <div>Manage Leave Types</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-people fs-2 mb-2"></i>
+                                <div>Employee Leave Credits</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-file-earmark-text fs-2 mb-2"></i>
+                                <div>Manage Required Leave Credits</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="#" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-bar-chart fs-2 mb-2"></i>
+                                <div>Leave Reports</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Recent Leave Activities</h5>
+                <ul class="list-group">
+                    <li class="list-group-item">
+                        <strong>John Doe</strong> applied for <em>Vacation Leave</em>.
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Jane Smith</strong>'s <em>Sick Leave</em> was approved.
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Mike Johnson</strong> canceled his <em>Personal Leave</em>.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
