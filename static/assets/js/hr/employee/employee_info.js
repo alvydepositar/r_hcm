@@ -90,7 +90,7 @@ $(function () {
                 return;
             }
 
-            fetch(`/api/employees/${rowData.employee_id}/`, {
+            fetch(`/hr/api/employees/${rowData.employee_id}/`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
