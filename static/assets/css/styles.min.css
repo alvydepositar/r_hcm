@@ -6169,9 +6169,9 @@ textarea.form-control-lg {
   --bs-modal-bg: var(--bs-body-bg);
   --bs-modal-border-color: var(--bs-border-color-translucent);
   --bs-modal-border-width: 0;
-  --bs-modal-border-radius: var(--bs-border-radius-lg);
+  --bs-modal-border-radius: var(--bs-border-radius-sm);
   --bs-modal-box-shadow: var(--bs-box-shadow-sm);
-  --bs-modal-inner-border-radius: calc(var(--bs-border-radius-lg) - 0);
+  --bs-modal-inner-border-radius: calc(var(--bs-border-radius-sm) - 0);
   --bs-modal-header-padding-x: 1rem;
   --bs-modal-header-padding-y: 1rem;
   --bs-modal-header-padding: 1rem 1rem;
@@ -6261,7 +6261,7 @@ textarea.form-control-lg {
   background-color: var(--bs-backdrop-bg);
 }
 .modal-backdrop.fade {
-  opacity: 0;
+  opacity: 50;
 }
 .modal-backdrop.show {
   opacity: var(--bs-backdrop-opacity);

@@ -1,7 +1,6 @@
 from django.shortcuts import render
-from rest_framework.viewsets import ModelViewSet
-from .models import Employee
-from .serializers import EmployeeSerializer
+from employee_modules.models import Employee
+from core.models import Division
 
 # Dashboard Views
 def employee_management(request):
@@ -19,7 +18,3 @@ def cc_management(request):
 # Employee Views
 def employee_info(request):
     return render(request, 'employee/employee_info.html')
-
-class EmployeeViewSet(ModelViewSet):
-    queryset = Employee.objects.all()
-    serializer_class = EmployeeSerializer

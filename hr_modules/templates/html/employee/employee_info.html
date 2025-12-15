@@ -21,7 +21,12 @@
 {% block content %}
     <div class="card">
         <div class="card-body">
-            <h5 class="card-title mb-4">Employee Details</h5>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="card-title mb-0">Employee Details</h5>
+                <button id="add-employee-btn" type="button" class="btn btn-primary btn-md">
+                    <i class="ti ti-plus"> </i> Add Employee
+                </button>
+            </div>
             <table id="employees-table" class="table table-striped">
                 <thead>
                     <tr>
@@ -37,10 +42,51 @@
             </table>
         </div>
     </div>
+
+    <!-- Add Employee Modal -->
+    <div class="modal fade" id="addEmployeeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Employee</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="add-employee-form">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="add-employee-id">Employee ID</label>
+                            <input id="add-employee-id" name="employee_id" type="text" class="form-control" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-first-name">First Name</label>
+                                <input id="add-first-name" name="first_name" type="text" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-last-name">Last Name</label>
+                                <input id="add-last-name" name="last_name" type="text" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="add-position">Position</label>
+                            <input id="add-position" name="position" type="text" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="add-division">Division</label>
+                            <select id="add-division" name="division" class="form-select" required></select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block extra_scripts %}
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
     {% load static %}
     <script src="{% static 'js/hr/employee/employee_info.js' %}"></script>
