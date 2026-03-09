@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/personal-data-sheet.css' %}">
+{% endblock %}
+
+{% block page_title %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="{% url 'employee_management' %}" class="text-decoration-none text-primary">
+                    <i class="bi bi-arrow-left-short"></i> Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Personal Data Sheet</li>
+        </ol>
+    </nav>
+{% endblock %}
+
+{% block content %}
+    <div id="pds-page" class="pds-page">
+        <form id="personal-data-sheet-form" class="pds-editor-form" novalidate>
+            <div class="card pds-toolbar-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                        <div>
+                            <div class="pds-form-code">CS Form No. 212, Revised 2025</div>
+                            <h5 class="card-title mb-1">Employee Personal Data Sheet</h5>
+                            <p class="text-muted mb-1">Based on the CSC Personal Data Sheet standard and organized by the official section flow.</p>
+                            <small class="text-muted">Print view is formatted for legal paper (8.5 x 14). Photo, thumb mark, and signature may still be attached separately for official submission.</small>
+                        </div>
+                        <div class="pds-toolbar-actions d-flex gap-2 align-items-end flex-wrap">
+                            <div class="pds-toolbar-field">
+                                <label class="form-label mb-1" for="pds-employee-select">Employee</label>
+                                <select id="pds-employee-select" class="form-select"></select>
+                            </div>
+                            <div class="pds-toolbar-status">
+                                <span id="pds-record-status" class="badge text-bg-light">No employee selected</span>
+                            </div>
+                            <button id="pds-reset-btn" type="button" class="btn btn-outline-secondary text-nowrap">
+                                <i class="ti ti-refresh"></i> Reset
+                            </button>
+                            <button id="pds-delete-btn" type="button" class="btn btn-outline-danger text-nowrap" disabled>
+                                <i class="ti ti-trash"></i> Delete
+                            </button>
+                            <button id="pds-save-btn" type="submit" class="btn btn-primary text-nowrap" disabled>
+                                <i class="ti ti-device-floppy"></i> Save Sheet
+                            </button>
+                            <button id="pds-print-btn" type="button" class="btn btn-outline-primary text-nowrap" disabled>
+                                <i class="ti ti-printer"></i> Print
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pds-section-card mb-4">
+                <div class="card-body">
+                    <div class="pds-section-heading">
+                        <span class="pds-section-index">I</span>
+                        <div>
+                            <h6 class="mb-1">Personal Information</h6>
+                            <p class="text-muted mb-0">Core identity, government account numbers, contact details, and address information.</p>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-3"><label class="form-label" for="pds-surname">Surname</label><input id="pds-surname" type="text" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-first-name">First Name</label><input id="pds-first-name" type="text" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-middle-name">Middle Name</label><input id="pds-middle-name" type="text" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-name-extension">Name Extension</label><input id="pds-name-extension" type="text" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-date-of-birth">Date of Birth</label><input id="pds-date-of-birth" type="date" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-place-of-birth">Place of Birth</label><input id="pds-place-of-birth" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-sex">Sex</label><select id="pds-sex" class="form-select"><option value="">Select sex</option><option value="female">Female</option><option value="male">Male</option></select></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-civil-status">Civil Status</label><select id="pds-civil-status" class="form-select"><option value="">Select status</option><option value="single">Single</option><option value="married">Married</option><option value="widowed">Widowed</option><option value="separated">Separated</option><option value="annulled">Annulled</option><option value="other">Other</option></select></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-civil-status-other">If Other</label><input id="pds-civil-status-other" type="text" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-citizenship">Citizenship</label><input id="pds-citizenship" type="text" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-citizenship-basis">Citizenship Acquired By</label><select id="pds-citizenship-basis" class="form-select"><option value="">Select basis</option><option value="by_birth">By Birth</option><option value="by_naturalization">By Naturalization</option></select></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-dual-citizenship-country">Dual Citizenship Country</label><input id="pds-dual-citizenship-country" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-height-m">Height (m)</label><input id="pds-height-m" type="number" min="0" step="0.01" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-weight-kg">Weight (kg)</label><input id="pds-weight-kg" type="number" min="0" step="0.01" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-blood-type">Blood Type</label><input id="pds-blood-type" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-gsis-id">GSIS ID No.</label><input id="pds-gsis-id" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-pagibig-id">PAG-IBIG ID No.</label><input id="pds-pagibig-id" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-philhealth-no">PhilHealth No.</label><input id="pds-philhealth-no" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-sss-no">SSS No.</label><input id="pds-sss-no" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-tin-no">TIN No.</label><input id="pds-tin-no" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-agency-employee-no">Agency Employee No.</label><input id="pds-agency-employee-no" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-telephone-no">Telephone No.</label><input id="pds-telephone-no" type="text" class="form-control"></div>
+                        <div class="col-md-2"><label class="form-label" for="pds-mobile-no">Mobile No.</label><input id="pds-mobile-no" type="text" class="form-control"></div>
+                        <div class="col-md-4"><label class="form-label" for="pds-email-address">Email Address</label><input id="pds-email-address" type="email" class="form-control"></div>
+                    </div>
+
+                    <div class="row g-4 mt-2">
+                        <div class="col-lg-6">
+                            <div class="pds-subsection-card">
+                                <h6 class="mb-3">Residential Address</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label class="form-label" for="pds-residential-house">House/Block/Lot No.</label><input id="pds-residential-house" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-residential-street">Street</label><input id="pds-residential-street" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-residential-subdivision">Subdivision/Village</label><input id="pds-residential-subdivision" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-residential-barangay">Barangay</label><input id="pds-residential-barangay" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-residential-city">City/Municipality</label><input id="pds-residential-city" type="text" class="form-control"></div>
+                                    <div class="col-md-4"><label class="form-label" for="pds-residential-province">Province</label><input id="pds-residential-province" type="text" class="form-control"></div>
+                                    <div class="col-md-2"><label class="form-label" for="pds-residential-zip">ZIP Code</label><input id="pds-residential-zip" type="text" class="form-control"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="pds-subsection-card">
+                                <h6 class="mb-3">Permanent Address</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label class="form-label" for="pds-permanent-house">House/Block/Lot No.</label><input id="pds-permanent-house" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-permanent-street">Street</label><input id="pds-permanent-street" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-permanent-subdivision">Subdivision/Village</label><input id="pds-permanent-subdivision" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-permanent-barangay">Barangay</label><input id="pds-permanent-barangay" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-permanent-city">City/Municipality</label><input id="pds-permanent-city" type="text" class="form-control"></div>
+                                    <div class="col-md-4"><label class="form-label" for="pds-permanent-province">Province</label><input id="pds-permanent-province" type="text" class="form-control"></div>
+                                    <div class="col-md-2"><label class="form-label" for="pds-permanent-zip">ZIP Code</label><input id="pds-permanent-zip" type="text" class="form-control"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pds-section-card mb-4">
+                <div class="card-body">
+                    <div class="pds-section-heading">
+                        <span class="pds-section-index">II</span>
+                        <div>
+                            <h6 class="mb-1">Family Background</h6>
+                            <p class="text-muted mb-0">Spouse, parents, and children information as reflected in the CSC sheet.</p>
+                        </div>
+                    </div>
+
+                    <div class="row g-4 mt-1">
+                        <div class="col-lg-4">
+                            <div class="pds-subsection-card">
+                                <h6 class="mb-3">Spouse</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label class="form-label" for="pds-spouse-surname">Surname</label><input id="pds-spouse-surname" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-spouse-first-name">First Name</label><input id="pds-spouse-first-name" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-spouse-middle-name">Middle Name</label><input id="pds-spouse-middle-name" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-spouse-extension">Name Extension</label><input id="pds-spouse-extension" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-spouse-occupation">Occupation</label><input id="pds-spouse-occupation" type="text" class="form-control"></div>
+                                    <div class="col-md-6"><label class="form-label" for="pds-spouse-employer">Employer/Business Name</label><input id="pds-spouse-employer" type="text" class="form-control"></div>
+                                    <div class="col-12"><label class="form-label" for="pds-spouse-business-address">Business Address</label><input id="pds-spouse-business-address" type="text" class="form-control"></div>
+                                    <div class="col-12"><label class="form-label" for="pds-spouse-telephone">Telephone No.</label><input id="pds-spouse-telephone" type="text" class="form-control"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-8">
+                            <div class="col-lg-12 mb-4">
+                                <div class="pds-subsection-card">
+                                    <h6 class="mb-3">Father</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6"><label class="form-label" for="pds-father-surname">Surname</label><input id="pds-father-surname" type="text" class="form-control"></div>
+                                        <div class="col-md-6"><label class="form-label" for="pds-father-first-name">First Name</label><input id="pds-father-first-name" type="text" class="form-control"></div>
+                                        <div class="col-md-6"><label class="form-label" for="pds-father-middle-name">Middle Name</label><input id="pds-father-middle-name" type="text" class="form-control"></div>
+                                        <div class="col-md-6"><label class="form-label" for="pds-father-extension">Name Extension</label><input id="pds-father-extension" type="text" class="form-control"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-12 ">
+                                <div class="pds-subsection-card">
+                                    <h6 class="mb-3">Mother's Maiden Name</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6"><label class="form-label" for="pds-mother-surname">Surname</label><input id="pds-mother-surname" type="text" class="form-control"></div>
+                                        <div class="col-md-6"><label class="form-label" for="pds-mother-first-name">First Name</label><input id="pds-mother-first-name" type="text" class="form-control"></div>
+                                        <div class="col-md-12"><label class="form-label" for="pds-mother-middle-name">Middle Name</label><input id="pds-mother-middle-name" type="text" class="form-control"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pds-table-card mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h6 class="mb-1">Children</h6>
+                                <small class="text-muted">List full names and dates of birth.</small>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="children"><i class="ti ti-plus"></i> Add Child</button>
+                        </div>
+                        <div class="pds-table-wrapper">
+                            <table class="table table-sm align-middle pds-data-table">
+                                <thead><tr><th>Full Name</th><th>Date of Birth</th><th class="pds-table-actions-col">Actions</th></tr></thead>
+                                <tbody id="children-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card pds-section-card mb-4">
+                <div class="card-body">
+                    <div class="pds-section-heading">
+                        <span class="pds-section-index">III</span>
+                        <div>
+                            <h6 class="mb-1">Educational Background</h6>
+                            <p class="text-muted mb-0">Structured to match the standard CSC education matrix by level.</p>
+                        </div>
+                    </div>
+                    <div class="pds-table-wrapper mt-3">
+                        <table class="table table-sm align-middle pds-data-table">
+                            <thead>
+                                <tr>
+                                    <th>Level</th><th>Name of School</th><th>Basic Education / Degree / Course</th><th>From</th><th>To</th><th>Highest Level / Units Earned</th><th>Year Graduated</th><th>Scholarship / Academic Honors</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><th>Elementary</th><td><input type="text" class="form-control form-control-sm" data-education-level="elementary" data-education-field="school_name"></td><td><input type="text" class="form-control form-control-sm" data-education-level="elementary" data-education-field="degree_course"></td><td><input type="text" class="form-control form-control-sm" data-education-level="elementary" data-education-field="period_from"></td><td><input type="text" class="form-control form-control-sm" data-education-level="elementary" data-education-field="period_to"></td><td><input type="text" class="form-control form-control-sm" data-education-level="elementary" data-education-field="highest_level_units"></td><td><input type="text" class="form-control form-control-sm" data-education-level="elementary" data-education-field="year_graduated"></td><td><input type="text" class="form-control form-control-sm" data-education-level="elementary" data-education-field="honors"></td></tr>
+                                <tr><th>Secondary</th><td><input type="text" class="form-control form-control-sm" data-education-level="secondary" data-education-field="school_name"></td><td><input type="text" class="form-control form-control-sm" data-education-level="secondary" data-education-field="degree_course"></td><td><input type="text" class="form-control form-control-sm" data-education-level="secondary" data-education-field="period_from"></td><td><input type="text" class="form-control form-control-sm" data-education-level="secondary" data-education-field="period_to"></td><td><input type="text" class="form-control form-control-sm" data-education-level="secondary" data-education-field="highest_level_units"></td><td><input type="text" class="form-control form-control-sm" data-education-level="secondary" data-education-field="year_graduated"></td><td><input type="text" class="form-control form-control-sm" data-education-level="secondary" data-education-field="honors"></td></tr>
+                                <tr><th>Vocational / Trade Course</th><td><input type="text" class="form-control form-control-sm" data-education-level="vocational" data-education-field="school_name"></td><td><input type="text" class="form-control form-control-sm" data-education-level="vocational" data-education-field="degree_course"></td><td><input type="text" class="form-control form-control-sm" data-education-level="vocational" data-education-field="period_from"></td><td><input type="text" class="form-control form-control-sm" data-education-level="vocational" data-education-field="period_to"></td><td><input type="text" class="form-control form-control-sm" data-education-level="vocational" data-education-field="highest_level_units"></td><td><input type="text" class="form-control form-control-sm" data-education-level="vocational" data-education-field="year_graduated"></td><td><input type="text" class="form-control form-control-sm" data-education-level="vocational" data-education-field="honors"></td></tr>
+                                <tr><th>College</th><td><input type="text" class="form-control form-control-sm" data-education-level="college" data-education-field="school_name"></td><td><input type="text" class="form-control form-control-sm" data-education-level="college" data-education-field="degree_course"></td><td><input type="text" class="form-control form-control-sm" data-education-level="college" data-education-field="period_from"></td><td><input type="text" class="form-control form-control-sm" data-education-level="college" data-education-field="period_to"></td><td><input type="text" class="form-control form-control-sm" data-education-level="college" data-education-field="highest_level_units"></td><td><input type="text" class="form-control form-control-sm" data-education-level="college" data-education-field="year_graduated"></td><td><input type="text" class="form-control form-control-sm" data-education-level="college" data-education-field="honors"></td></tr>
+                                <tr><th>Graduate Studies</th><td><input type="text" class="form-control form-control-sm" data-education-level="graduate" data-education-field="school_name"></td><td><input type="text" class="form-control form-control-sm" data-education-level="graduate" data-education-field="degree_course"></td><td><input type="text" class="form-control form-control-sm" data-education-level="graduate" data-education-field="period_from"></td><td><input type="text" class="form-control form-control-sm" data-education-level="graduate" data-education-field="period_to"></td><td><input type="text" class="form-control form-control-sm" data-education-level="graduate" data-education-field="highest_level_units"></td><td><input type="text" class="form-control form-control-sm" data-education-level="graduate" data-education-field="year_graduated"></td><td><input type="text" class="form-control form-control-sm" data-education-level="graduate" data-education-field="honors"></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pds-section-card mb-4">
+                <div class="card-body">
+                    <div class="pds-section-heading"><span class="pds-section-index">IV</span><div><h6 class="mb-1">Civil Service Eligibility</h6><p class="text-muted mb-0">Eligibility, rating, examination details, and license validity.</p></div></div>
+                    <div class="pds-table-card mt-3">
+                        <div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-outline-primary btn-sm" data-add-row="civil_service_eligibilities"><i class="ti ti-plus"></i> Add Eligibility</button></div>
+                        <div class="pds-table-wrapper">
+                            <table class="table table-sm align-middle pds-data-table">
+                                <thead><tr><th>Eligibility</th><th>Rating</th><th>Date of Exam / Conferment</th><th>Place of Exam / Conferment</th><th>License No.</th><th>Validity</th><th class="pds-table-actions-col">Actions</th></tr></thead>
+                                <tbody id="civil_service_eligibilities-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pds-section-card mb-4">
+                <div class="card-body">
+                    <div class="pds-section-heading"><span class="pds-section-index">V</span><div><h6 class="mb-1">Work Experience</h6><p class="text-muted mb-0">Position history in line with the CSC work experience sheet fields.</p></div></div>
+                    <div class="pds-table-card mt-3">
+                        <div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-outline-primary btn-sm" data-add-row="work_experiences"><i class="ti ti-plus"></i> Add Work Experience</button></div>
+                        <div class="pds-table-wrapper">
+                            <table class="table table-sm align-middle pds-data-table">
+                                <thead><tr><th>From</th><th>To</th><th>Position Title</th><th>Department / Agency / Company</th><th>Monthly Salary</th><th>Salary Grade / Step</th><th>Status of Appointment</th><th>Gov't Service</th><th class="pds-table-actions-col">Actions</th></tr></thead>
+                                <tbody id="work_experiences-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pds-section-card mb-4">
+                <div class="card-body">
+                    <div class="pds-section-heading"><span class="pds-section-index">VI</span><div><h6 class="mb-1">Voluntary Work or Involvement in Civic / Non-Government / People / Voluntary Organizations</h6><p class="text-muted mb-0">Record voluntary service and organizational involvement.</p></div></div>
+                    <div class="pds-table-card mt-3">
+                        <div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-outline-primary btn-sm" data-add-row="voluntary_works"><i class="ti ti-plus"></i> Add Voluntary Work</button></div>
+                        <div class="pds-table-wrapper">
+                            <table class="table table-sm align-middle pds-data-table">
+                                <thead><tr><th>Name & Address of Organization</th><th>From</th><th>To</th><th>No. of Hours</th><th>Position / Nature of Work</th><th class="pds-table-actions-col">Actions</th></tr></thead>
+                                <tbody id="voluntary_works-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pds-section-card mb-4">
+                <div class="card-body">
+                    <div class="pds-section-heading"><span class="pds-section-index">VII</span><div><h6 class="mb-1">Learning and Development Interventions / Training Programs Attended</h6><p class="text-muted mb-0">Training history by title, inclusive dates, hours, type, and provider.</p></div></div>
+                    <div class="pds-table-card mt-3">
+                        <div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-outline-primary btn-sm" data-add-row="learning_and_development"><i class="ti ti-plus"></i> Add Training Record</button></div>
+                        <div class="pds-table-wrapper">
+                            <table class="table table-sm align-middle pds-data-table">
+                                <thead><tr><th>Title of Learning and Development Intervention / Training Program</th><th>From</th><th>To</th><th>No. of Hours</th><th>Type</th><th>Conducted / Sponsored By</th><th class="pds-table-actions-col">Actions</th></tr></thead>
+                                <tbody id="learning_and_development-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pds-section-card mb-4">
+                <div class="card-body">
+                    <div class="pds-section-heading"><span class="pds-section-index">VIII</span><div><h6 class="mb-1">Other Information</h6><p class="text-muted mb-0">Use one item per line for special skills, recognitions, and memberships.</p></div></div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-lg-4"><label class="form-label" for="pds-special-skills">Special Skills / Hobbies</label><textarea id="pds-special-skills" class="form-control pds-line-list" rows="7" placeholder="One skill or hobby per line"></textarea></div>
+                        <div class="col-lg-4"><label class="form-label" for="pds-recognitions">Non-Academic Distinctions / Recognition</label><textarea id="pds-recognitions" class="form-control pds-line-list" rows="7" placeholder="One distinction or recognition per line"></textarea></div>
+                        <div class="col-lg-4"><label class="form-label" for="pds-memberships">Membership in Association / Organization</label><textarea id="pds-memberships" class="form-control pds-line-list" rows="7" placeholder="One organization per line"></textarea></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pds-section-card mb-4">
+                <div class="card-body">
+                    <div class="pds-section-heading"><span class="pds-section-index">IX</span><div><h6 class="mb-1">Questionnaire, References, and Government-Issued ID</h6><p class="text-muted mb-0">Standard declaration section, references, and final identification details.</p></div></div>
+                    <div class="row g-3 mt-2">
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">34a. Related within the third degree to the appointing or recommending authority?</label><select class="form-select mb-2" data-question-key="q34a" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q34a" data-question-field="details" placeholder="If yes, provide details" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">34b. Related to the person who will review your application or supervise you?</label><select class="form-select mb-2" data-question-key="q34b" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q34b" data-question-field="details" placeholder="If yes, provide details" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">35a. Have you ever been found guilty of an administrative offense?</label><select class="form-select mb-2" data-question-key="q35a" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q35a" data-question-field="details" placeholder="If yes, provide details" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">35b. Do you have any pending administrative or criminal case?</label><select class="form-select mb-2" data-question-key="q35b" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q35b" data-question-field="details" placeholder="State the nature, date filed, and current status" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">36. Have you ever been convicted of any crime or violation of any law, decree, ordinance, or regulation?</label><select class="form-select mb-2" data-question-key="q36" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q36" data-question-field="details" placeholder="If yes, provide details" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">37. Have you ever been separated from service in the public or private sector?</label><select class="form-select mb-2" data-question-key="q37" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q37" data-question-field="details" placeholder="If yes, provide details" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">38a. Were you a candidate in a national or local election, except barangay election?</label><select class="form-select mb-2" data-question-key="q38a" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q38a" data-question-field="details" placeholder="If yes, provide details" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">38b. Did you resign during the three-month period before the last election to campaign?</label><select class="form-select mb-2" data-question-key="q38b" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q38b" data-question-field="details" placeholder="If yes, provide details" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">39. Have you acquired immigrant status in another country?</label><select class="form-select mb-2" data-question-key="q39" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q39" data-question-field="details" placeholder="If yes, specify country and status" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">40a. Are you a member of any indigenous group?</label><select class="form-select mb-2" data-question-key="q40a" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q40a" data-question-field="details" placeholder="If yes, specify" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">40b. Are you a person with disability?</label><select class="form-select mb-2" data-question-key="q40b" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q40b" data-question-field="details" placeholder="If yes, specify" hidden></textarea></div></div>
+                        <div class="col-lg-6"><div class="pds-question-card"><label class="form-label">40c. Are you a solo parent?</label><select class="form-select mb-2" data-question-key="q40c" data-question-field="answer"><option value="">Select answer</option><option value="yes">Yes</option><option value="no">No</option></select><textarea class="form-control" rows="2" data-question-key="q40c" data-question-field="details" placeholder="If yes, specify" hidden></textarea></div></div>
+                    </div>
+
+                    <div class="pds-table-card mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div><h6 class="mb-1">References</h6><small class="text-muted">The CSC sheet typically carries up to three references.</small></div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-add-row="references"><i class="ti ti-plus"></i> Add Reference</button>
+                        </div>
+                        <div class="pds-table-wrapper">
+                            <table class="table table-sm align-middle pds-data-table">
+                                <thead><tr><th>Name</th><th>Address</th><th>Telephone / Mobile No.</th><th class="pds-table-actions-col">Actions</th></tr></thead>
+                                <tbody id="references-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-3">
+                        <div class="col-md-3"><label class="form-label" for="pds-government-id-type">Government-Issued ID</label><input id="pds-government-id-type" type="text" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-government-id-number">ID / License / Passport No.</label><input id="pds-government-id-number" type="text" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-government-id-date">Date of Issuance</label><input id="pds-government-id-date" type="date" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label" for="pds-date-accomplished">Date Accomplished</label><input id="pds-date-accomplished" type="date" class="form-control"></div>
+                        <div class="col-12"><label class="form-label" for="pds-government-id-place">Place of Issuance</label><input id="pds-government-id-place" type="text" class="form-control"></div>
+                    </div>
+                </div>
+            </div>
+        </form>
+        {% include "html/employee/partials/personal_data_sheet_print.html" %}
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {% load static %}
+    <script src="{% static 'js/hr/employee/personal_data_sheet.js' %}"></script>
+{% endblock %}

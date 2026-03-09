@@ -1,4 +1,3 @@
-from multiprocessing import context
 from django.shortcuts import render
 from employee_modules.models import Employee
 from core.models import Division
@@ -27,6 +26,9 @@ def cc_management(request):
 def employee_info(request):
     return render(request, 'employee/employee_info.html')
 
+def personal_data_sheet(request):
+    return render(request, 'employee/personal_data_sheet.html')
+
 # Core Views
 def divisions(request):
     return render(request, 'employee/divisions.html')
@@ -37,5 +39,15 @@ def positions(request):
 def time_rules(request):
     return render(request, 'employee/time_rules.html')
 
+def salary_grades(request):
+    return render(request, 'employee/salary_grades.html')
+
+def csc_plantilla(request):
+    return render(request, 'employee/csc_plantilla.html')
+
 def approvers(request):
-    return render(request, 'employee/approvers.html')
+    context = {
+        'divisions': Division.objects.order_by('division_name'),
+        'employees': Employee.objects.order_by('first_name', 'last_name'),
+    }
+    return render(request, 'employee/approvers.html', context)

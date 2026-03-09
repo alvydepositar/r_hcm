@@ -1,0 +1,427 @@
+.pds-page {
+    padding-bottom: 2rem;
+}
+
+.pds-toolbar-card,
+.pds-section-card {
+    box-shadow: 0 18px 40px rgba(153, 109, 0, 0.08);
+}
+
+.pds-form-code {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.65rem;
+    margin-bottom: 0.75rem;
+    border-radius: 999px;
+    background: #fff5db;
+    color: #996d00;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.pds-toolbar-actions {
+    justify-content: flex-end;
+}
+
+.pds-toolbar-field {
+    min-width: 280px;
+}
+
+.pds-toolbar-field .hcm-searchable-select {
+    min-width: 280px;
+}
+
+.pds-toolbar-status {
+    min-width: 150px;
+    padding-bottom: 0.2rem;
+}
+
+.pds-section-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.pds-section-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.4rem;
+    min-height: 2.4rem;
+    border-radius: 0.75rem;
+    background: #ffd477;
+    color: #704d00;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.pds-subsection-card,
+.pds-question-card,
+.pds-table-card {
+    padding: 1rem;
+    border: 1px solid #8d8d8d91;
+    border-radius: 1rem;
+}
+
+.pds-table-wrapper {
+    overflow-x: auto;
+}
+
+.pds-data-table {
+    margin-bottom: 0;
+}
+
+.pds-data-table thead th {
+    white-space: nowrap;
+    background: #fff5db;
+    color: #6f4e00;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.pds-data-table td,
+.pds-data-table th {
+    vertical-align: middle;
+}
+
+.pds-data-table .form-control,
+.pds-data-table .form-select {
+    min-width: 130px;
+}
+
+.pds-table-actions-col {
+    width: 96px;
+    text-align: center;
+}
+
+.pds-line-list {
+    min-height: 180px;
+}
+
+.pds-print-layout {
+    display: none;
+}
+
+.pds-print-sheet {
+    width: 8in;
+    min-height: 13.35in;
+    margin: 0 auto 1rem;
+    padding: 0.2in 0.22in 0.22in;
+    background: #fff;
+    color: #000;
+    font-family: "Arial", sans-serif;
+    font-size: 8px;
+    line-height: 1.25;
+}
+
+.pds-print-header {
+    display: grid;
+    grid-template-columns: 1fr 2.4fr 1fr;
+    gap: 0.18in;
+    align-items: start;
+}
+
+.pds-print-header-meta,
+.pds-print-header-subtitle,
+.pds-print-header-country,
+.pds-print-banner,
+.pds-print-subsection-note,
+.pds-print-footer {
+    font-size: 7px;
+}
+
+.pds-print-header-meta {
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.pds-print-header-title {
+    text-align: center;
+}
+
+.pds-print-header-title h1 {
+    margin: 0.04in 0;
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+}
+
+.pds-print-photo-box {
+    min-height: 1.45in;
+    border: 1px solid #000;
+    padding: 0.08in;
+    text-align: center;
+    font-size: 7px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.08in;
+}
+
+.pds-print-photo-title {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.pds-print-banner {
+    margin-top: 0.12in;
+    padding: 0.05in 0.08in;
+    border: 1px solid #000;
+    background: #f1f1f1;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.pds-print-section-title {
+    margin-top: 0.14in;
+    padding: 0.04in 0.08in;
+    border: 1px solid #000;
+    border-bottom: none;
+    background: #e8e8e8;
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.pds-print-section-title span {
+    display: inline-block;
+    min-width: 0.22in;
+}
+
+.pds-print-section-gap {
+    margin-top: 0.16in;
+}
+
+.pds-print-grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.pds-print-grid td,
+.pds-print-grid th {
+    border: 1px solid #000;
+    padding: 0;
+    vertical-align: top;
+}
+
+.pds-print-grid th {
+    background: #efefef;
+    padding: 0.03in 0.04in;
+    font-size: 6.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: center;
+}
+
+.pds-print-cell-label {
+    min-height: 0.18in;
+    padding: 0.02in 0.04in;
+    border-bottom: 1px solid #000;
+    background: #efefef;
+    font-size: 6.1px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.pds-print-cell-value {
+    min-height: 0.2in;
+    padding: 0.03in 0.04in;
+}
+
+.pds-print-tight-table .pds-print-cell-value {
+    min-height: 0.18in;
+}
+
+.pds-print-multiline {
+    min-height: 0.34in;
+    white-space: pre-line;
+}
+
+.pds-print-choice-wrap,
+.pds-print-choice-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.05in 0.12in;
+}
+
+.pds-print-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.04in;
+}
+
+.pds-print-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.12in;
+    height: 0.12in;
+    border: 1px solid #000;
+    font-size: 9px;
+    line-height: 1;
+}
+
+.pds-print-table td {
+    padding: 0.03in 0.04in;
+    min-height: 0.18in;
+}
+
+.pds-print-check-cell {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.pds-print-subsection-note {
+    padding: 0.04in 0.06in;
+    border-left: 1px solid #000;
+    border-right: 1px solid #000;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+#pds-print-other-info-body td {
+    min-height: 0.18in;
+}
+
+.pds-print-declaration-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 0.12in;
+    margin-top: 0.16in;
+}
+
+.pds-print-declaration-box,
+.pds-print-oath-box {
+    border: 1px solid #000;
+    padding: 0.08in;
+    min-height: 1.9in;
+}
+
+.pds-print-declaration-copy {
+    text-align: justify;
+}
+
+.pds-print-signature-line {
+    margin-top: 0.18in;
+}
+
+.pds-print-signature-box {
+    min-height: 0.28in;
+    border-bottom: 1px solid #000;
+}
+
+.pds-print-signature-caption {
+    margin-top: 0.03in;
+    text-align: center;
+    font-size: 6.5px;
+    text-transform: uppercase;
+}
+
+.pds-print-oath-box {
+    display: grid;
+    grid-template-columns: 0.9fr 1.1fr;
+    gap: 0.1in;
+}
+
+.pds-print-oath-column {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1in;
+}
+
+.pds-print-placeholder-box {
+    min-height: 0.88in;
+    border: 1px solid #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.08in;
+    text-align: center;
+    font-size: 6.8px;
+    text-transform: uppercase;
+}
+
+.pds-print-footer {
+    margin-top: 0.12in;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #000;
+    padding-top: 0.05in;
+    text-transform: uppercase;
+}
+
+@media (max-width: 991.98px) {
+    .pds-toolbar-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .pds-toolbar-field,
+    .pds-toolbar-field .hcm-searchable-select {
+        min-width: 100%;
+        width: 100%;
+    }
+}
+
+@media print {
+    @page {
+        size: 8.5in 14in;
+        margin: 0.2in;
+    }
+
+    body {
+        background: #fff !important;
+    }
+
+    .left-sidebar,
+    .app-header,
+    .page_title,
+    .pds-editor-form,
+    .breadcrumb,
+    .footer,
+    .simplebar-placeholder {
+        display: none !important;
+    }
+
+    .page-wrapper,
+    .body-wrapper,
+    .body-wrapper-inner,
+    .container-fluid,
+    .pds-page {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        background: #fff !important;
+    }
+
+    .pds-print-layout {
+        display: block !important;
+    }
+
+    .pds-print-sheet {
+        width: auto;
+        min-height: auto;
+        margin: 0;
+        padding: 0;
+        page-break-after: always;
+        break-after: page;
+    }
+
+    .pds-print-sheet:last-child {
+        page-break-after: auto;
+        break-after: auto;
+    }
+}

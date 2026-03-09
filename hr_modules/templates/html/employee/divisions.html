@@ -1,9 +1,5 @@
 {% extends "base.html" %}
 
-{% block extra_head %}
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.1.8/css/dataTables.dataTables.min.css">
-{% endblock %}
-
 {% block page_title %}
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb mb-0">
@@ -23,21 +19,26 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="card-title mb-0">Divisions</h5>
-                <button id="add-division-btn" type="button" class="btn btn-primary btn-md">
-                    <i class="ti ti-plus"> </i> Add Division
-                </button>
+                <div class="d-flex gap-2 align-items-center flex-nowrap">
+                    <input type="text" class="table-search form-control" id="table-search" placeholder="Search..." style="min-width: 200px; white-space: nowrap;">
+                    <button id="edit-all-divisions-btn" type="button" class="btn btn-outline-primary btn-md text-nowrap">
+                        <i class="ti ti-edit"></i> Edit All Rows
+                    </button>
+                    <button id="save-all-divisions-btn" type="button" class="btn btn-success btn-md text-nowrap d-none">
+                        <i class="ti ti-device-floppy"></i> Save All
+                    </button>
+                    <button id="cancel-all-divisions-btn" type="button" class="btn btn-secondary btn-md text-nowrap d-none">
+                        <i class="ti ti-x"></i> Cancel All
+                    </button>
+                    <button id="delete-selected-divisions-btn" type="button" class="btn btn-danger btn-md d-none">
+                        <i class="ti ti-trash"></i> Delete Selected
+                    </button>
+                    <button id="add-division-btn" type="button" class="btn btn-primary btn-md">
+                        <i class="ti ti-plus"> </i> Add Division
+                    </button>
+                </div>
             </div>
-            <table id="divisions-table" class="table table-striped">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" id="select-all"></th>
-                        <th class="text-center">Division ID</th>
-                        <th>Division Name</th>
-                        <th>Abbreviation</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div id="divisions-table"></div>
         </div>
     </div>
 
@@ -73,7 +74,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-    <script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
     {% load static %}
     <script src="{% static 'js/hr/employee/divisions.js' %}"></script>
 {% endblock %}

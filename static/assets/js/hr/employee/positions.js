@@ -1,199 +1,115 @@
-$(function () {
-    const table = $('#positions-table').DataTable({
-        ajax: {
-            url: '/api/positions/',
-            dataSrc: ''
-        },
-        columns: [
-            {
-                data: null,
-                orderable: false,
-                defaultContent: '',
-                className: 'select-checkbox',
-                render: function (data, type, row) {
-                    return `<input type="checkbox" class="select-row" data-id="${row.id}">`;
-                }
-            },
-            { data: 'position_id'},
-            { data: 'position_name', className: 'editable' },
-            { data: 'description', className: 'editable' }
-        ],
-        order: [[1, 'asc']]
-    });
+const positionRowEditor = createTableRowEditor({
+    primaryKey: "position_id",
+    editableFields: [
+        "position_name",
+        "description",
+    ],
+    patchUrlBase: "/api/positions/",
+    deleteUrlBase: "/api/positions/",
+    deleteConfirmMessage: "Delete this position?",
+    bulkDeleteConfirmMessage: "Delete the selected positions?",
+});
 
-    // Column configuration: index -> field + editor type
-    const columnConfig = {
-        1: { field: 'position_id', type: 'number' },
-        2: { field: 'position_name', type: 'text' },
-        3: { field: 'description', type: 'text' }
+const positionFactory = new tableFactory({
+    el: "#positions-table",
+    api: {
+        list: "/api/positions/",
+        detail: "/api/positions/",
+    },
+    primaryKey: "position_id",
+    autoSaveEdits: false,
+    columns: [
+        {
+            formatter: "rowSelection",
+            titleFormatter: "rowSelection",
+            hozAlign: "left",
+            headerSort: false,
+            width: 50,
+        },
+        {
+            title: "ID",
+            field: "position_id",
+            hozAlign: "center",
+            headerSort: true,
+            width: 120,
+        },
+        {
+            title: "Position Name",
+            field: "position_name",
+            editable: cell => positionRowEditor.isEditingRow(cell.getRow().getData()),
+            editor: "input",
+            headerSort: true,
+        },
+        {
+            title: "Description",
+            field: "description",
+            editable: cell => positionRowEditor.isEditingRow(cell.getRow().getData()),
+            editor: "input",
+            headerSort: true,
+        },
+        positionRowEditor.buildActionsColumn(),
+    ],
+});
+
+const positionTable = positionFactory.create();
+positionRowEditor.attachTable(positionTable);
+bindTableSearchInput("table-search", positionFactory);
+bindBulkEditActionButtons(positionRowEditor, {
+    editAllButton: document.getElementById("edit-all-positions-btn"),
+    saveAllButton: document.getElementById("save-all-positions-btn"),
+    cancelAllButton: document.getElementById("cancel-all-positions-btn"),
+});
+bindSelectionActionButton(
+    positionTable,
+    document.getElementById("delete-selected-positions-btn")
+);
+const positionModalElement = document.getElementById("addPositionModal");
+const positionModal = new bootstrap.Modal(positionModalElement);
+const positionForm = document.getElementById("add-position-form");
+
+document.getElementById("add-position-btn").addEventListener("click", () => {
+    positionForm.reset();
+    positionModal.show();
+});
+
+document.getElementById("delete-selected-positions-btn").addEventListener("click", () => {
+    positionRowEditor.deleteSelectedRows({
+        emptySelectionMessage: "Select at least one position to delete.",
+    });
+});
+
+positionForm.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const payload = {
+        position_name: document.getElementById("add-position-name").value.trim(),
+        description: document.getElementById("add-description").value.trim(),
     };
 
-    // Inline editing
-    $('#positions-table').on('click', 'tbody td.editable', function () {
-        const cell = table.cell(this);
-        const colIdx = cell.index().column;
-        const config = columnConfig[colIdx];
-        if (!config) return;
-
-        const $td = $(this);
-        if ($td.hasClass('editing')) return; // avoid double init
-
-        const displayValue = cell.data();
-        const rowData = table.row(this.closest('tr')).data();
-        const originalEditValue = displayValue;
-
-        let isSaving = false;
-        let cancelled = false;
-        $td.addClass('editing');
-        $td.data('original', displayValue);
-
-        // Create input element
-        const inputType = config.type === 'number' ? 'number' : 'text';
-        $td.html(`<input type="${inputType}" value="${displayValue}" size="${displayValue.length + 2}">`);
-        const $input = $td.find('input');
-        $input.focus().select();
-
-        function cancelEdit() {
-            cancelled = true;
-            $input.off('blur');
-            $td.removeClass('editing');
-            $td.text(displayValue);
-        }
-
-        function saveEdit() {
-            if (isSaving || cancelled) return;
-            const newValue = $input.val();
-            
-            // nothing changed
-            if (String(newValue ?? '') === String(originalEditValue ?? '')) {
-                cancelEdit();
-                return;
-            }
-
-            isSaving = true;
-            $input.prop('disabled', true);
-
-            fetch(`/api/positions/${rowData.position_id}/`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken,
-                },
-                body: JSON.stringify({ [config.field]: newValue })
-            })
-            .then(res => {
-                if (res.ok) return res.json();
-
-                // Try to surface validation errors from the API
-                return res.json()
-                    .then(data => {
-                        const msg = typeof data === 'object' ? JSON.stringify(data) : data;
-                        throw new Error(msg || 'Failed to save');
-                    })
-                    .catch(() => {
-                        throw new Error('Failed to save');
-                    });
-            })
-            .then(updated => {
-                // update row with server response
-                const updatedDisplay = updated[config.field];
-
-                rowData[config.field] = updated[config.field];
-
-                // Update the cell display
-                $td.text(updatedDisplay);
-                $td.removeClass('editing');
-
-                // Refresh the row data
-                table.row($td.closest('tr')).data(rowData);
-            })
-            .catch((err) => {
-                alert(`Failed to save. ${err.message || ''}`);
-                cancelEdit();
-            })
-            .finally(() => {
-                isSaving = false;
-            });
-        }
-
-        $input.on('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                saveEdit();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                cancelEdit();
-            }
-        });
-
-        $input.on('blur', function () {
-            // auto-save on blur
-            saveEdit();
-        });
-    });
-
-    // Add position modal + handler
-    const $addModal = $('#addPositionModal');
-    const $addForm = $('#add-position-form');
-
-    if (!$addModal.length || !$addForm.length) {
-        console.warn('Add position modal not found in DOM.');
+    if (!payload.position_name || !payload.description) {
+        alert("Please complete all required fields.");
         return;
     }
 
-    const modalEl = $addModal[0];
-    const bootstrapModal = typeof bootstrap !== 'undefined'
-        ? new bootstrap.Modal(modalEl)
-        : null;
-
-    $('#add-position-btn').on('click', function () {
-        $addForm[0].reset();
-        if (bootstrapModal) {
-            bootstrapModal.show();
-        } else {
-            $addModal.show(); // basic fallback
-        }
-    });
-
-    $addForm.on('submit', function (e) {
-        e.preventDefault();
-        const payload = {
-            position_name: $('#add-position-name').val().trim(),
-            description: $('#add-description').val().trim()
-        };
-
-        if (!payload.position_name || !payload.description) {
-            alert('Please complete all required fields.');
-            return;
-        }
-
-        fetch('/api/positions/', {
-            method: 'POST',
+    try {
+        const response = await fetch("/api/positions/", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken,
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrftoken,
             },
-            body: JSON.stringify(payload)
-        })
-        .then(res => {
-            if (res.ok) return res.json();
-            return res.json()
-                .then(data => {
-                    const msg = typeof data === 'object' ? JSON.stringify(data) : data;
-                    throw new Error(msg || 'Failed to save');
-                })
-                .catch(() => { throw new Error('Failed to save'); });
-        })
-        .then(() => {
-            if (bootstrapModal) {
-                bootstrapModal.hide();
-            } else {
-                $addModal.hide();
-            }
-            table.ajax.reload(null, false);
-        })
-        .catch(err => {
-            alert(`Failed to add position. ${err.message || ''}`);
+            body: JSON.stringify(payload),
         });
-    });
+
+        if (!response.ok) {
+            throw new Error(await readApiError(response, "Failed to add position"));
+        }
+
+        positionModal.hide();
+        positionForm.reset();
+        positionRowEditor.reset();
+        positionTable.replaceData();
+    } catch (err) {
+        alert(err.message);
+    }
 });

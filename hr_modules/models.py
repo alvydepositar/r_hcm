@@ -4,6 +4,10 @@ from core.models import Division
 from employee_modules.models import Employee
 
 class Approver(models.Model):
+    class ApprovalType(models.TextChoices):
+        DIVISION = "division", "Division"
+        EMPLOYEE = "employee", "Employee"
+
     approver_id = models.AutoField(primary_key=True)
     approval_type = models.CharField(max_length=50)
     division_id = models.ForeignKey(Division, on_delete=models.CASCADE, null=True, blank=True, related_name='approver_division')

@@ -2,7 +2,8 @@
 
 {% block extra_head %}
 {% endblock %}
-                         
+
+{% block page_title %}
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item">
@@ -23,6 +24,18 @@
                 <h5 class="card-title mb-0">Approvers</h5>
                 <div class="d-flex gap-2 align-items-center flex-nowrap">
                     <input type="text" class="table-search form-control" id="table-search" placeholder="Search..." style="min-width: 200px; white-space: nowrap;">
+                    <button id="edit-all-rows-btn" type="button" class="btn btn-outline-primary btn-md text-nowrap">
+                        <i class="ti ti-edit"></i> Edit All Rows
+                    </button>
+                    <button id="save-all-rows-btn" type="button" class="btn btn-success btn-md text-nowrap d-none">
+                        <i class="ti ti-device-floppy"></i> Save All
+                    </button>
+                    <button id="cancel-all-rows-btn" type="button" class="btn btn-secondary btn-md text-nowrap d-none">
+                        <i class="ti ti-x"></i> Cancel All
+                    </button>
+                    <button id="delete-selected-approvers-btn" type="button" class="btn btn-danger btn-md text-nowrap d-none">
+                        <i class="ti ti-trash"></i> Delete Selected
+                    </button>
                     <button id="add-approver-btn" type="button" class="btn btn-primary btn-md text-nowrap">
                         <i class="ti ti-plus"></i> Add Approvers
                     </button>
@@ -49,12 +62,12 @@
         </div>
     </div>
 
-    <!-- Add Employee Approver Modal -->
+    <!-- Add Approver Modal -->
     <div class="modal fade" id="addApproverModal" tabindex="-1" aria-labelledby="addApproverModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add Employee Approver</h5>
+                    <h5 class="modal-title">Add Approver</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="add-approver-form">
@@ -70,16 +83,16 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label" for="add-division">Division</label>
-                                <select id="add-division" name="division" class="form-select">
+                                <select id="add-division" name="division_id" class="form-select">
                                     <option value="" disabled selected>Select Division</option>
                                     {% for division in divisions %}
-                                        <option value="{{ division.id }}">{{ division.name }}</option>
+                                        <option value="{{ division.division_id }}">{{ division.division_name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label" for="add-employee">Employee</label>
-                                <select id="add-employee" name="employee_name" class="form-select">
+                                <select id="add-employee" name="employee_id" class="form-select">
                                     <option value="" disabled selected>Select Employee</option>
                                     {% for employee in employees %}
                                         <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>
@@ -96,8 +109,8 @@
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label" for="add-alt-immediate-supervisor">Alternative Immediate Supervisor</label>
-                                <select id="add-alt-supervisor" name="alt_immediate_supervisor" class="form-select">
+                                <label class="form-label" for="add-alt-supervisor">Alternative Immediate Supervisor</label>
+                                <select id="add-alt-supervisor" name="alt_supervisor" class="form-select">
                                     <option value="" disabled selected>Select Alternative Immediate Supervisor</option>
                                     {% for employee in employees %}
                                         <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>

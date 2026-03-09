@@ -1,9 +1,5 @@
 {% extends "base.html" %}
 
-{% block extra_head %}
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.1.8/css/dataTables.dataTables.min.css">
-{% endblock %}
-
 {% block page_title %}
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb mb-0">
@@ -23,27 +19,26 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="card-title mb-0">Time Rules</h5>
-                <button id="add-time-rule-btn" type="button" class="btn btn-primary btn-md">
-                    <i class="ti ti-plus"> </i> Add Time Rule
-                </button>
+                <div class="d-flex gap-2 align-items-center flex-nowrap">
+                    <input type="text" class="table-search form-control" id="table-search" placeholder="Search..." style="min-width: 200px; white-space: nowrap;">
+                    <button id="edit-all-time-rules-btn" type="button" class="btn btn-outline-primary btn-md text-nowrap">
+                        <i class="ti ti-edit"></i> Edit All Rows
+                    </button>
+                    <button id="save-all-time-rules-btn" type="button" class="btn btn-success btn-md text-nowrap d-none">
+                        <i class="ti ti-device-floppy"></i> Save All
+                    </button>
+                    <button id="cancel-all-time-rules-btn" type="button" class="btn btn-secondary btn-md text-nowrap d-none">
+                        <i class="ti ti-x"></i> Cancel All
+                    </button>
+                    <button id="delete-selected-time-rules-btn" type="button" class="btn btn-danger btn-md d-none">
+                        <i class="ti ti-trash"></i> Delete Selected
+                    </button>
+                    <button id="add-time-rule-btn" type="button" class="btn btn-primary btn-md">
+                        <i class="ti ti-plus"> </i> Add Time Rule
+                    </button>
+                </div>
             </div>
-            <table id="time-rules-table" class="table table-striped">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" id="select-all"></th>
-                        <th class="text-center">ID</th>
-                        <th>Time Rule Name</th>
-                        <th>Earliest In</th>
-                        <th>Latest In</th>
-                        <th>Earliest Out</th>
-                        <th>Latest Out</th>
-                        <th>Lunch Start</th>
-                        <th>Lunch End</th>
-                        <th>Lunch Grace Period (min)</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div id="time-rules-table"></div>
         </div>
     </div>
 
@@ -103,7 +98,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-    <script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
     {% load static %}
     <script src="{% static 'js/hr/employee/time_rules.js' %}"></script>
 {% endblock %}

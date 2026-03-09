@@ -1,15 +1,26 @@
 from django.urls import path, include
 from . import views
-
-from .views import *
+from .views import (
+    ApproverViewSet,
+    CSCPlantillaViewSet,
+    DivisionViewSet,
+    EmployeeViewSet,
+    EmployeePersonalDataSheetViewSet,
+    PositionViewSet,
+    SalaryGradeViewSet,
+    TimeRuleViewSet,
+)
 
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
 router.register(r'employees', EmployeeViewSet)
+router.register(r'personal-data-sheets', EmployeePersonalDataSheetViewSet)
 router.register(r'divisions', DivisionViewSet)
 router.register(r'positions', PositionViewSet)
 router.register(r'time_rules', TimeRuleViewSet)
+router.register(r'salary_grades', SalaryGradeViewSet)
+router.register(r'csc-plantilla', CSCPlantillaViewSet)
 router.register(r'approvers', ApproverViewSet)
 
 urlpatterns = [
