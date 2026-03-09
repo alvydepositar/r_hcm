@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+{% endblock %}
+                         
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="{% url 'employee_management' %}" class="text-decoration-none text-primary">
+                    <i class="bi bi-arrow-left-short"></i> Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Approvers</li>
+        </ol>
+    </nav>
+{% endblock %}
+
+
+{% block content %}
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="card-title mb-0">Approvers</h5>
+                <div class="d-flex gap-2 align-items-center flex-nowrap">
+                    <input type="text" class="table-search form-control" id="table-search" placeholder="Search..." style="min-width: 200px; white-space: nowrap;">
+                    <button id="add-approver-btn" type="button" class="btn btn-primary btn-md text-nowrap">
+                        <i class="ti ti-plus"></i> Add Approvers
+                    </button>
+                </div>
+            </div>
+
+            <ul class="nav nav-underline w-100" id="approverTabs" role="tablist">
+                <li class="nav-item flex-grow-1 text-center" role="presentation">
+                    <button class="nav-link active w-100" id="division-tab" data-bs-toggle="tab" data-bs-target="#division" data-table-key="division" type="button" role="tab" aria-controls="division" aria-selected="true">Division Approvers</button>
+                </li>
+                <li class="nav-item flex-grow-1 text-center" role="presentation">
+                    <button class="nav-link w-100" id="employee-tab" data-bs-toggle="tab" data-bs-target="#employee" data-table-key="employee" type="button" role="tab" aria-controls="employee" aria-selected="false">Employee Approvers</button>
+                </li>
+            </ul>
+            
+            <div class="tab-content mt-4" id="approverTabsContent">
+                <div class="tab-pane fade show active" id="division" role="tabpanel" aria-labelledby="division-tab">
+                    <div id="division-approvers-table"></div>
+                </div>
+                <div class="tab-pane fade" id="employee" role="tabpanel" aria-labelledby="employee-tab">
+                    <div id="employee-approvers-table"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Employee Approver Modal -->
+    <div class="modal fade" id="addApproverModal" tabindex="-1" aria-labelledby="addApproverModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Employee Approver</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="add-approver-form">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label " for="add-approver-type">Approver Type</label>
+                                <select id="add-approver-type" name="approver_type" class="form-select" required>
+                                    <option value="" disabled selected>Select Approver Type</option>
+                                    <option value="division">Division</option>
+                                    <option value="employee">Employee</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-division">Division</label>
+                                <select id="add-division" name="division" class="form-select">
+                                    <option value="" disabled selected>Select Division</option>
+                                    {% for division in divisions %}
+                                        <option value="{{ division.id }}">{{ division.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-employee">Employee</label>
+                                <select id="add-employee" name="employee_name" class="form-select">
+                                    <option value="" disabled selected>Select Employee</option>
+                                    {% for employee in employees %}
+                                        <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-immediate-supervisor">Immediate Supervisor</label>
+                                <select id="add-immediate-supervisor" name="immediate_supervisor" class="form-select" required>
+                                    <option value="" disabled selected>Select Immediate Supervisor</option>
+                                    {% for employee in employees %}
+                                        <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-alt-immediate-supervisor">Alternative Immediate Supervisor</label>
+                                <select id="add-alt-supervisor" name="alt_immediate_supervisor" class="form-select">
+                                    <option value="" disabled selected>Select Alternative Immediate Supervisor</option>
+                                    {% for employee in employees %}
+                                        <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-division-chief">Division Chief</label>
+                                <select id="add-division-chief" name="division_chief" class="form-select" required>
+                                    <option value="" disabled selected>Select Division Chief</option>
+                                    {% for employee in employees %}
+                                        <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-alt-division-chief">Alternative Division Chief</label>
+                                <select id="add-alt-division-chief" name="alt_division_chief" class="form-select">
+                                    <option value="" disabled selected>Select Alternative Division Chief</option>
+                                    {% for employee in employees %}
+                                        <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-hr-approver">HR Approver</label>
+                                <select id="add-hr-approver" name="hr_approver" class="form-select" required>
+                                    <option value="" disabled selected>Select HR Approver</option>
+                                    {% for employee in employees %}
+                                        <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-alt-hr-approver">Alternative HR Approver</label>
+                                <select id="add-alt-hr-approver" name="alt_hr_approver" class="form-select">
+                                    <option value="" disabled selected>Select Alternative HR Approver</option>
+                                    {% for employee in employees %}
+                                        <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {% load static %}
+    <script src="{% static 'js/hr/employee/approvers.js' %}"></script>
+{% endblock %}

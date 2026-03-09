@@ -16161,4 +16161,53 @@ ul {
   background: linear-gradient(90deg, #ed7853 0, #e577ac 53.08%, #9f8be9 97.99%);
 }
 
-/*# sourceMappingURL=styles.min.css.map */
+/* Base table */
+.tabulator {
+    border: none !important;
+    background: transparent !important;
+    font-family: inherit !important;
+}
+
+.tabulator-header {
+    background: transparent !important;
+    border-bottom: 1px solid #e9ecef !important;
+    color: #212529 !important;
+    padding-bottom: 12px !important;
+}
+
+.tabulator-col {
+    background: transparent !important;
+    border: none !important;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.tabulator-row {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid #edf2f7 !important;
+}
+
+.tabulator-cell {
+    border: none;
+    padding: 14px 12px;
+    font-size: 0.9rem;
+}
+
+.tabulator-row:hover {
+    background-color: rgba(0,0,0,0.02);
+}
+
+.tabulator-col:not(:last-child),
+.tabulator-cell:not(:last-child) {
+    border-right: none !important;
+}
+
+.tabulator .tabulator-footer {
+    background: transparent !important;
+    border-top: 1px solid #e9ecef !important;
+}
+
+#division-approvers-table > div.tabulator-footer > div > span > span > button {
+    color: var(--bs-primary);
+}

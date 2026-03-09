@@ -8,7 +8,7 @@
         <div class="card overflow-hidden">
             <div class="card-body">
                 <h5 class="card-title mb-9 fs-4 fw-light">Total Employees</h5>
-                <h4 class="fw-semibold mb-2 fs-8">350</h4>
+                <h4 class="fw-semibold mb-2 fs-8">{{ total_employees }}</h4>
             </div>
         </div>
     </div>
@@ -17,7 +17,7 @@
         <div class="card overflow-hidden">
             <div class="card-body">
                 <h5 class="card-title mb-9 fs-4 fw-light">Division Groups</h5>
-                <h4 class="fw-semibold mb-2 fs-8">15</h4>
+                <h4 class="fw-semibold mb-2 fs-8">{{ division_groups }}</h4>
             </div>
         </div>
     </div>
@@ -49,7 +49,15 @@
                         </a>
                     </div>
                     <div class="col-4">
-                        <a href="#" class="text-decoration-none">
+                        <a href="{% url 'approvers' %}" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-people-fill fs-2 mb-2"></i>
+                                <div>Manage Employee Approvers</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-4">
+                        <a href="{% url 'divisions' %}" class="text-decoration-none">
                             <div class="tile text-center p-3 border rounded">
                                 <i class="bi bi-building fs-2 mb-2"></i>
                                 <div>Manage Divisions</div>
@@ -57,7 +65,7 @@
                         </a>
                     </div>
                     <div class="col-4">
-                        <a href="#" class="text-decoration-none">
+                        <a href="{% url 'time_rules' %}" class="text-decoration-none">
                             <div class="tile text-center p-3 border rounded">
                                 <i class="bi bi-clock-history fs-2 mb-2"></i>
                                 <div>Manage Time Rules</div>
@@ -65,7 +73,7 @@
                         </a>
                     </div>
                     <div class="col-4">
-                        <a href="#" class="text-decoration-none">
+                        <a href="{% url 'positions' %}" class="text-decoration-none">
                             <div class="tile text-center p-3 border rounded">
                                 <i class="bi bi-briefcase fs-2 mb-2"></i>
                                 <div>Manage Positions</div>
