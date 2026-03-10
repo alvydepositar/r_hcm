@@ -1,9 +1,18 @@
+const divisionViewFields = [
+    { label: "Division ID", field: "division_id" },
+    { label: "Division Name", field: "division_name" },
+    { label: "Abbreviation", field: "division_abbreviation" },
+];
+
 const divisionRowEditor = createTableRowEditor({
     primaryKey: "division_id",
     editableFields: [
         "division_name",
         "division_abbreviation",
     ],
+    viewFields: divisionViewFields,
+    getViewTitle: rowData => `Division Record: ${rowData.division_name}`,
+    getViewSubtitle: rowData => `Record ID ${rowData.division_id}`,
     patchUrlBase: "/api/divisions/",
     deleteUrlBase: "/api/divisions/",
     deleteConfirmMessage: "Delete this division?",
@@ -47,7 +56,7 @@ const divisionFactory = new tableFactory({
             editor: "input",
             headerSort: true,
         },
-        divisionRowEditor.buildActionsColumn(),
+        divisionRowEditor.buildActionsColumn({ width: 190 }),
     ],
 });
 

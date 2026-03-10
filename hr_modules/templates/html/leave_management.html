@@ -8,7 +8,7 @@
         <div class="card overflow-hidden">
             <div class="card-body">
                 <h5 class="card-title mb-9 fs-4 fw-light">Total Leave Requests</h5>
-                <h4 class="fw-semibold mb-2 fs-8">120</h4>
+                <h4 class="fw-semibold mb-2 fs-8">{{ total_leave_requests }}</h4>
             </div>
         </div>
     </div>
@@ -16,7 +16,7 @@
         <div class="card overflow-hidden">
             <div class="card-body">
                 <h5 class="card-title mb-9 fs-4 fw-light">Approved Leaves</h5>
-                <h4 class="fw-semibold mb-2 fs-8">85</h4>
+                <h4 class="fw-semibold mb-2 fs-8">{{ approved_leaves }}</h4>
             </div>
         </div>
     </div>
@@ -24,7 +24,7 @@
         <div class="card overflow-hidden">
             <div class="card-body">
                 <h5 class="card-title mb-9 fs-4 fw-light">Pending Leaves</h5>
-                <h4 class="fw-semibold mb-2 fs-8">35</h4>
+                <h4 class="fw-semibold mb-2 fs-8">{{ pending_leaves }}</h4>
             </div>
         </div>
     </div>
@@ -39,15 +39,15 @@
                 <!-- Quick Links in Tiles -->
                 <div class="row g-3">
                     <div class="col-4">
-                        <a href="#" class="text-decoration-none">
+                        <a href="{% url 'leave_applications' %}" class="text-decoration-none">
                             <div class="tile text-center p-3 border rounded">
                                 <i class="bi bi-check2-square fs-2 mb-2"></i>
-                                <div>Approve Leaves</div>
+                                <div>Leave Applications</div>
                             </div>
                         </a>
                     </div>
                     <div class="col-4">
-                        <a href="#" class="text-decoration-none">
+                        <a href="{% url 'leave_types' %}" class="text-decoration-none">
                             <div class="tile text-center p-3 border rounded">
                                 <i class="bi bi-calendar-plus fs-2 mb-2"></i>
                                 <div>Manage Leave Types</div>
@@ -55,7 +55,7 @@
                         </a>
                     </div>
                     <div class="col-4">
-                        <a href="#" class="text-decoration-none">
+                        <a href="{% url 'employee_leave_credits' %}" class="text-decoration-none">
                             <div class="tile text-center p-3 border rounded">
                                 <i class="bi bi-people fs-2 mb-2"></i>
                                 <div>Employee Leave Credits</div>
@@ -63,10 +63,10 @@
                         </a>
                     </div>
                     <div class="col-4">
-                        <a href="#" class="text-decoration-none">
+                        <a href="{% url 'leave_applications' %}" class="text-decoration-none">
                             <div class="tile text-center p-3 border rounded">
                                 <i class="bi bi-file-earmark-text fs-2 mb-2"></i>
-                                <div>Manage Required Leave Credits</div>
+                                <div>Review Leave Filings</div>
                             </div>
                         </a>
                     </div>
@@ -89,13 +89,13 @@
                 <h5 class="card-title mb-4">Recent Leave Activities</h5>
                 <ul class="list-group">
                     <li class="list-group-item">
-                        <strong>John Doe</strong> applied for <em>Vacation Leave</em>.
+                        <strong>{{ total_leave_requests }}</strong> leave application{{ total_leave_requests|pluralize }} currently recorded.
                     </li>
                     <li class="list-group-item">
-                        <strong>Jane Smith</strong>'s <em>Sick Leave</em> was approved.
+                        <strong>{{ approved_leaves }}</strong> filing{{ approved_leaves|pluralize }} already approved.
                     </li>
                     <li class="list-group-item">
-                        <strong>Mike Johnson</strong> canceled his <em>Personal Leave</em>.
+                        <strong>{{ leave_credit_records }}</strong> leave credit bucket{{ leave_credit_records|pluralize }} maintained for employees.
                     </li>
                 </ul>
             </div>

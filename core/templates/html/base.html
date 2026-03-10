@@ -82,7 +82,7 @@
               <li class="sidebar-item">
                 <a class="sidebar-link" href="{% url 'cc_management' %}" aria-expanded="false">
                   <i class="ti ti-clock"></i>
-                  <span class="hide-menu">Clock Management</span>
+                  <span class="hide-menu">Time Correction</span>
                 </a>
               </li>
             </div>
@@ -288,6 +288,15 @@
           </ul>
           <div class="navbar-collapse justify-content-end px-0" id="navbarNav">
             <ul class="navbar-nav flex-row ms-auto align-items-center justify-content-end">
+              <li class="nav-item me-2">
+                <a
+                  class="btn btn-outline-primary btn-sm text-nowrap"
+                  id="switch-employee-portal-btn"
+                  href="{% url 'index' %}?portal=employee"
+                >
+                  Switch to Employee Portal
+                </a>
+              </li>
               <li class="nav-item dropdown">
                 <a class="nav-link " href="javascript:void(0)" id="drop2" data-bs-toggle="dropdown"
                   aria-expanded="false">
@@ -335,6 +344,32 @@
   <script src="{% static 'js/helpers.js' %}"></script>
   <script src="{% static 'js/sidebarmenu.js' %}"></script>
   <script src="{% static 'js/app.min.js' %}"></script>
+  <script>
+    (() => {
+      const portalMode = new URLSearchParams(window.location.search).get("portal");
+      const isEmployeePortal = portalMode === "employee";
+
+      const hrAdminNav = document.getElementById("hr-admin-nav");
+      const employeeNav = document.getElementById("employee-nav");
+      const hrDashboard = document.getElementById("hr-dashboard");
+      const employeeDashboard = document.getElementById("employee-dashboard");
+      const switchEmployeePortalButton = document.getElementById("switch-employee-portal-btn");
+
+      if (hrAdminNav && employeeNav) {
+        hrAdminNav.style.display = isEmployeePortal ? "none" : "";
+        employeeNav.style.display = isEmployeePortal ? "" : "none";
+      }
+
+      if (hrDashboard && employeeDashboard) {
+        hrDashboard.style.display = isEmployeePortal ? "none" : "";
+        employeeDashboard.style.display = isEmployeePortal ? "" : "none";
+      }
+
+      if (switchEmployeePortalButton) {
+        switchEmployeePortalButton.classList.toggle("d-none", isEmployeePortal);
+      }
+    })();
+  </script>
   
   <script src="{% static 'libs/simplebar/dist/simplebar.js' %}"></script>
   <!-- solar icons -->

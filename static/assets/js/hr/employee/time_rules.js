@@ -1,3 +1,15 @@
+const timeRuleViewFields = [
+    { label: "Time Rule ID", field: "time_rule_id" },
+    { label: "Time Rule Name", field: "time_rule_name" },
+    { label: "Earliest In", field: "earliest_in" },
+    { label: "Latest In", field: "latest_in" },
+    { label: "Earliest Out", field: "earliest_out" },
+    { label: "Latest Out", field: "latest_out" },
+    { label: "Lunch Start", field: "lunch_start" },
+    { label: "Lunch End", field: "lunch_end" },
+    { label: "Lunch Grace Period (min)", field: "lunch_grace_period" },
+];
+
 const timeRuleRowEditor = createTableRowEditor({
     primaryKey: "time_rule_id",
     editableFields: [
@@ -10,6 +22,9 @@ const timeRuleRowEditor = createTableRowEditor({
         "lunch_end",
         "lunch_grace_period",
     ],
+    viewFields: timeRuleViewFields,
+    getViewTitle: rowData => `Time Rule: ${rowData.time_rule_name}`,
+    getViewSubtitle: rowData => `Record ID ${rowData.time_rule_id}`,
     patchUrlBase: "/api/time_rules/",
     deleteUrlBase: "/api/time_rules/",
     deleteConfirmMessage: "Delete this time rule?",

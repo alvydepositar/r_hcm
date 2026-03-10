@@ -5,6 +5,9 @@ urlpatterns = [
     # Dashboard URLs
     path('employee-management/', views.employee_management, name='employee_management'),
     path('leave-management/', views.leave_management, name='leave_management'),
+    path('leave-types/', views.leave_types, name='leave_types'),
+    path('leave-credits/', views.employee_leave_credits, name='employee_leave_credits'),
+    path('leave-applications/', views.leave_applications, name='leave_applications'),
     path('oba-management/', views.oba_management, name='oba_management'),
     path('cc-management/', views.cc_management, name='cc_management'),
     # Employee URLs

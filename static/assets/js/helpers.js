@@ -14,6 +14,214 @@ function getCookie(name) {
 }
 
 const csrftoken = getCookie('csrftoken');
+const nativeAlert = window.alert.bind(window);
+const nativeConfirm = window.confirm.bind(window);
+let hcmToastContainer = null;
+let hcmConfirmDialog = null;
+let searchableSelectMeasurementContext = null;
+
+function normalizeSystemMessage(message) {
+    if (message instanceof Error) {
+        return message.message || 'Request failed';
+    }
+
+    if (message === null || message === undefined) {
+        return '';
+    }
+
+    return String(message).trim();
+}
+
+function inferSystemToastTone(message) {
+    const normalized = normalizeSystemMessage(message).toLowerCase();
+
+    if (/(failed|error|unable|invalid|delete|not available|not function|required)/.test(normalized)) {
+        return 'danger';
+    }
+
+    if (/(saved|updated|success|complete|loaded|created)/.test(normalized)) {
+        return 'success';
+    }
+
+    return 'warning';
+}
+
+function getSystemToastTitle(tone) {
+    if (tone === 'danger') {
+        return 'Attention';
+    }
+
+    if (tone === 'success') {
+        return 'Updated';
+    }
+
+    return 'Notice';
+}
+
+function getSystemToastContainer() {
+    if (hcmToastContainer) {
+        return hcmToastContainer;
+    }
+
+    const container = document.createElement('div');
+    container.className = 'toast-container position-fixed top-0 end-0 p-3 hcm-toast-container';
+    document.body.appendChild(container);
+    hcmToastContainer = container;
+    return container;
+}
+
+function showSystemToast({ message, title, tone, delay = 3200 } = {}) {
+    const normalizedMessage = normalizeSystemMessage(message);
+    if (!normalizedMessage) {
+        return null;
+    }
+
+    if (!document.body || !window.bootstrap?.Toast) {
+        nativeAlert(normalizedMessage);
+        return null;
+    }
+
+    const resolvedTone = tone || inferSystemToastTone(normalizedMessage);
+    const toast = document.createElement('div');
+    toast.className = `toast hcm-toast hcm-toast--${resolvedTone}`;
+    toast.role = 'alert';
+    toast.ariaLive = 'assertive';
+    toast.ariaAtomic = 'true';
+    toast.innerHTML = `
+        <div class="toast-body">
+            <div class="hcm-toast__content">
+                <div class="hcm-toast__title">${title || getSystemToastTitle(resolvedTone)}</div>
+                <div class="hcm-toast__message"></div>
+            </div>
+            <button type="button" class="btn-close ms-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+
+    toast.querySelector('.hcm-toast__message').textContent = normalizedMessage;
+    getSystemToastContainer().appendChild(toast);
+
+    const instance = new bootstrap.Toast(toast, {
+        delay,
+        autohide: true,
+    });
+
+    toast.addEventListener('hidden.bs.toast', () => {
+        toast.remove();
+    }, { once: true });
+
+    instance.show();
+    return instance;
+}
+
+function getSystemConfirmDialog() {
+    if (hcmConfirmDialog) {
+        return hcmConfirmDialog;
+    }
+
+    const element = document.createElement('div');
+    element.className = 'modal fade';
+    element.id = 'hcmConfirmModal';
+    element.tabIndex = -1;
+    element.setAttribute('aria-hidden', 'true');
+    element.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content hcm-confirm-modal">
+                <div class="modal-header border-0 pb-0">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-0">
+                    <div class="hcm-confirm">
+                        <div class="hcm-confirm__eyebrow">Confirm Action</div>
+                        <h5 class="hcm-confirm__title">Proceed with this action?</h5>
+                        <p class="hcm-confirm__message mb-0"></p>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <div class="hcm-confirm__actions">
+                        <button type="button" class="btn btn-light hcm-confirm__cancel" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger hcm-confirm__confirm">Confirm</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(element);
+
+    hcmConfirmDialog = {
+        element,
+        modal: new bootstrap.Modal(element),
+        title: element.querySelector('.hcm-confirm__title'),
+        message: element.querySelector('.hcm-confirm__message'),
+        cancelButton: element.querySelector('.hcm-confirm__cancel'),
+        confirmButton: element.querySelector('.hcm-confirm__confirm'),
+        resolve: null,
+    };
+
+    hcmConfirmDialog.confirmButton.addEventListener('click', () => {
+        const resolve = hcmConfirmDialog.resolve;
+        hcmConfirmDialog.resolve = null;
+        hcmConfirmDialog.modal.hide();
+
+        if (typeof resolve === 'function') {
+            resolve(true);
+        }
+    });
+
+    element.addEventListener('hidden.bs.modal', () => {
+        const resolve = hcmConfirmDialog.resolve;
+        hcmConfirmDialog.resolve = null;
+
+        if (typeof resolve === 'function') {
+            resolve(false);
+        }
+    });
+
+    return hcmConfirmDialog;
+}
+
+function getSystemConfirmButtonClass(tone) {
+    if (tone === 'primary') {
+        return 'btn btn-primary hcm-confirm__confirm';
+    }
+
+    if (tone === 'warning') {
+        return 'btn btn-warning hcm-confirm__confirm';
+    }
+
+    return 'btn btn-danger hcm-confirm__confirm';
+}
+
+function showSystemConfirm(message, {
+    title = 'Proceed with this action?',
+    confirmLabel = 'Confirm',
+    cancelLabel = 'Cancel',
+    tone = 'danger',
+} = {}) {
+    const normalizedMessage = normalizeSystemMessage(message);
+
+    if (!document.body || !window.bootstrap?.Modal) {
+        return Promise.resolve(nativeConfirm(normalizedMessage));
+    }
+
+    const dialog = getSystemConfirmDialog();
+    dialog.title.textContent = title;
+    dialog.message.textContent = normalizedMessage;
+    dialog.cancelButton.textContent = cancelLabel;
+    dialog.confirmButton.textContent = confirmLabel;
+    dialog.confirmButton.className = getSystemConfirmButtonClass(tone);
+
+    return new Promise(resolve => {
+        dialog.resolve = resolve;
+        dialog.modal.show();
+    });
+}
+
+window.showSystemToast = showSystemToast;
+window.showSystemConfirm = showSystemConfirm;
+window.alert = message => {
+    showSystemToast({ message });
+};
 
 async function readApiError(response, fallbackMessage = 'Request failed') {
     try {
@@ -182,7 +390,8 @@ function resolveDivisionReference(value) {
 const positionState = {
     options: [],
     lookup: new Map(),
-    reverseLookup: new Map()
+    reverseLookup: new Map(),
+    records: new Map(),
 };
 
 function loadPositions() {
@@ -199,12 +408,18 @@ function loadPositions() {
             }).filter(d => d.value !== undefined && d.value !== null);
             positionState.lookup = new Map(positionState.options.map(o => [String(o.value), o.label]));
             positionState.reverseLookup = new Map(positionState.options.map(o => [o.label, o.value]));
+            positionState.records = new Map(
+                data
+                    .filter(d => (d.id ?? d.position_id) !== undefined && (d.id ?? d.position_id) !== null)
+                    .map(d => [String(d.id ?? d.position_id), d])
+            );
         })
         .catch(err => {
             console.error(err);
             positionState.options = [];
             positionState.lookup = new Map();
             positionState.reverseLookup = new Map();
+            positionState.records = new Map();
         });
 }
 
@@ -235,6 +450,19 @@ function resolvePositionReference(value) {
 
     const parsed = parseInt(normalized, 10);
     return Number.isNaN(parsed) ? normalized : parsed;
+}
+
+function getPositionRecord(value) {
+    if (value === null || value === undefined || value === "") {
+        return null;
+    }
+
+    const resolvedValue = resolvePositionReference(value);
+    if (resolvedValue === null || resolvedValue === undefined || resolvedValue === "") {
+        return null;
+    }
+
+    return positionState.records.get(String(resolvedValue)) || null;
 }
 
 const salaryGradeState = {
@@ -338,6 +566,80 @@ function getSalaryStepOptionsForGrade(salaryGradeValue) {
         }));
 }
 
+const leaveTypeState = {
+    options: [],
+    lookup: new Map(),
+    reverseLookup: new Map(),
+    records: new Map(),
+};
+
+function loadLeaveTypes() {
+    return fetch('/api/leave-types/')
+        .then(res => {
+            if (!res.ok) throw new Error('Failed to load leave types');
+            return res.json();
+        })
+        .then(data => {
+            leaveTypeState.options = data.map(record => ({
+                value: record.leave_type_id,
+                label: record.leave_name,
+            })).filter(option => option.value !== undefined && option.value !== null);
+            leaveTypeState.lookup = new Map(leaveTypeState.options.map(option => [String(option.value), option.label]));
+            leaveTypeState.reverseLookup = new Map(leaveTypeState.options.map(option => [option.label, option.value]));
+            leaveTypeState.records = new Map(
+                data
+                    .filter(record => record.leave_type_id !== undefined && record.leave_type_id !== null)
+                    .map(record => [String(record.leave_type_id), record])
+            );
+        })
+        .catch(err => {
+            console.error(err);
+            leaveTypeState.options = [];
+            leaveTypeState.lookup = new Map();
+            leaveTypeState.reverseLookup = new Map();
+            leaveTypeState.records = new Map();
+        });
+}
+
+function formatLeaveTypeReference(value) {
+    if (value === null || value === undefined || value === '') {
+        return '';
+    }
+
+    const normalized = String(value);
+    return leaveTypeState.lookup.get(normalized) || normalized;
+}
+
+function resolveLeaveTypeReference(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    const normalized = String(value).trim();
+
+    if (leaveTypeState.lookup.has(normalized)) {
+        const parsed = parseInt(normalized, 10);
+        return Number.isNaN(parsed) ? normalized : parsed;
+    }
+
+    if (leaveTypeState.reverseLookup.has(normalized)) {
+        return leaveTypeState.reverseLookup.get(normalized);
+    }
+
+    const parsed = parseInt(normalized, 10);
+    return Number.isNaN(parsed) ? normalized : parsed;
+}
+
+function getLeaveTypeRecord(value) {
+    const resolvedValue = resolveLeaveTypeReference(value);
+
+    if (resolvedValue === null || resolvedValue === undefined || resolvedValue === '') {
+        return null;
+    }
+
+    return leaveTypeState.records.get(String(resolvedValue)) || null;
+}
+
 function normalizeLookupOptions(options = []) {
     return options
         .filter(option => option && option.value !== undefined && option.value !== null)
@@ -347,22 +649,52 @@ function normalizeLookupOptions(options = []) {
         }));
 }
 
+function populateLookupSelect(select, options = [], placeholder = "Select an option") {
+    if (!(select instanceof HTMLSelectElement)) {
+        return;
+    }
+
+    const normalizedOptions = normalizeLookupOptions(options);
+    select.innerHTML = "";
+
+    if (placeholder !== null && placeholder !== undefined) {
+        const placeholderOption = document.createElement("option");
+        placeholderOption.value = "";
+        placeholderOption.textContent = placeholder;
+        select.appendChild(placeholderOption);
+    }
+
+    normalizedOptions.forEach(option => {
+        const optionElement = document.createElement("option");
+        optionElement.value = String(option.value);
+        optionElement.textContent = option.label;
+        select.appendChild(optionElement);
+    });
+}
+
 function buildSearchableListEditorParams(options, {
     clearable = false,
     placeholder = "Select an option",
     searchPlaceholder = "Search options",
+    searchable = undefined,
+    searchCategory = "",
+    minSearchOptions = undefined,
 } = {}) {
     return {
         values: normalizeLookupOptions(options),
         clearable,
         placeholder,
         searchPlaceholder,
+        searchable,
+        searchCategory,
+        minSearchOptions,
     };
 }
 
 const searchableSelectRegistry = new WeakMap();
 const searchableSelectStates = new Set();
 let searchableSelectEventsBound = false;
+const DEFAULT_MIN_SEARCHABLE_OPTIONS = 10;
 
 function getSearchableSelectNow() {
     if (typeof performance !== "undefined" && typeof performance.now === "function") {
@@ -407,6 +739,175 @@ function getSelectedOption(select) {
     return select.options[selectedIndex] || null;
 }
 
+function normalizeYesNoChoice(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+
+    if (normalized === "yes") {
+        return "yes";
+    }
+
+    if (normalized === "no") {
+        return "no";
+    }
+
+    return null;
+}
+
+function isPeopleSearchCategory(value) {
+    return String(value ?? "").trim().toLowerCase() === "person";
+}
+
+function isPeopleSelect(select, enhancementOptions = {}) {
+    if (isPeopleSearchCategory(enhancementOptions.searchCategory) || isPeopleSearchCategory(select.dataset.searchCategory)) {
+        return true;
+    }
+
+    const labelText = getSelectLabelText(select);
+    const placeholderText = getSelectPlaceholder(select);
+    const metadata = [
+        enhancementOptions.searchPlaceholder,
+        enhancementOptions.placeholder,
+        select.id,
+        select.name,
+        select.getAttribute("aria-label"),
+        labelText,
+        placeholderText,
+    ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+    return /\b(employee|employees|person|people|personnel|approver|supervisor|chief|officer|manager|head|staff|applicant|candidate)\b/.test(metadata);
+}
+
+function getMeaningfulSearchableSelectOptionCount(select) {
+    return getSearchableSelectOptions(select)
+        .filter(option => String(option.value ?? "").trim() !== "")
+        .length;
+}
+
+function shouldUseSearchableSelectSearch(select, enhancementOptions = {}) {
+    if (enhancementOptions.searchable === true) {
+        return true;
+    }
+
+    if (enhancementOptions.searchable === false) {
+        return false;
+    }
+
+    const optionChoices = getSearchableSelectOptions(select)
+        .filter(option => String(option.value ?? "").trim() !== "")
+        .map(option => normalizeYesNoChoice(option.label) || normalizeYesNoChoice(option.value))
+        .filter(Boolean);
+
+    if (optionChoices.length !== 2) {
+        if (isPeopleSelect(select, enhancementOptions)) {
+            return true;
+        }
+
+        const configuredMinimum = Number(
+            enhancementOptions.minSearchOptions
+            ?? select.dataset.minSearchOptions
+            ?? DEFAULT_MIN_SEARCHABLE_OPTIONS
+        );
+        const minSearchOptions = Number.isFinite(configuredMinimum)
+            ? configuredMinimum
+            : DEFAULT_MIN_SEARCHABLE_OPTIONS;
+
+        return getMeaningfulSearchableSelectOptionCount(select) >= minSearchOptions;
+    }
+
+    return !(optionChoices.includes("yes") && optionChoices.includes("no"));
+}
+
+function getSearchableSelectMeasurementContext() {
+    if (searchableSelectMeasurementContext) {
+        return searchableSelectMeasurementContext;
+    }
+
+    const canvas = document.createElement("canvas");
+    searchableSelectMeasurementContext = canvas.getContext("2d");
+    return searchableSelectMeasurementContext;
+}
+
+function getSearchableSelectViewportWidth() {
+    if (window.visualViewport?.width) {
+        return window.visualViewport.width;
+    }
+
+    if (window.innerWidth) {
+        return window.innerWidth;
+    }
+
+    return document.documentElement?.clientWidth || 0;
+}
+
+function getSearchableSelectMeasurementFont(state) {
+    const computedStyle = window.getComputedStyle(state.triggerLabel || state.trigger);
+    const lineHeight = computedStyle.lineHeight && computedStyle.lineHeight !== "normal"
+        ? `/${computedStyle.lineHeight}`
+        : "";
+
+    return [
+        computedStyle.fontStyle || "normal",
+        computedStyle.fontVariant || "normal",
+        computedStyle.fontWeight || "400",
+        `${computedStyle.fontSize || "14px"}${lineHeight}`,
+        computedStyle.fontFamily || "sans-serif",
+    ].join(" ");
+}
+
+function getSearchableSelectLongestOptionWidth(state) {
+    const context = getSearchableSelectMeasurementContext();
+    if (!context) {
+        return 0;
+    }
+
+    context.font = getSearchableSelectMeasurementFont(state);
+
+    return getSearchableSelectOptions(state.select).reduce((maxWidth, option) => {
+        const labelWidth = Math.ceil(context.measureText(option.label || "").width);
+        return Math.max(maxWidth, labelWidth);
+    }, 0);
+}
+
+function sizeSearchableSelectMenu(state) {
+    if (!state?.menu || !state.root.classList.contains("is-open")) {
+        return;
+    }
+
+    const viewportWidth = getSearchableSelectViewportWidth();
+    const viewportPadding = 16;
+    const triggerWidth = Math.ceil(state.trigger.getBoundingClientRect().width);
+    const longestOptionWidth = getSearchableSelectLongestOptionWidth(state);
+    const desiredWidth = Math.max(triggerWidth, 240, longestOptionWidth + 112);
+    const maxWidth = viewportWidth > 0
+        ? Math.max(triggerWidth, Math.floor(viewportWidth - (viewportPadding * 2)))
+        : desiredWidth;
+    const resolvedWidth = Math.min(desiredWidth, maxWidth);
+
+    state.menu.style.width = `${resolvedWidth}px`;
+    state.menu.style.left = "0px";
+    state.menu.style.right = "auto";
+
+    if (viewportWidth <= 0) {
+        return;
+    }
+
+    const menuRect = state.menu.getBoundingClientRect();
+    let offset = 0;
+
+    if (menuRect.right > viewportWidth - viewportPadding) {
+        offset -= menuRect.right - (viewportWidth - viewportPadding);
+    }
+
+    if (menuRect.left + offset < viewportPadding) {
+        offset += viewportPadding - (menuRect.left + offset);
+    }
+
+    state.menu.style.left = `${Math.round(offset)}px`;
+}
+
 function closeSearchableSelect(state, { keepSearch = false } = {}) {
     state.root.classList.remove("is-open");
     state.trigger.setAttribute("aria-expanded", "false");
@@ -438,8 +939,24 @@ function updateSearchableSelectTrigger(state) {
     state.trigger.disabled = state.select.disabled;
 }
 
+function syncSearchableSelectSearchMode(state) {
+    const hasSearch = shouldUseSearchableSelectSearch(state.select, state.enhancementOptions);
+
+    state.hasSearch = hasSearch;
+    state.root.classList.toggle("hcm-searchable-select--no-search", !hasSearch);
+    state.searchWrap.hidden = !hasSearch;
+    state.searchInput.disabled = !hasSearch;
+    state.searchInput.tabIndex = hasSearch ? 0 : -1;
+
+    if (!hasSearch) {
+        state.searchInput.value = "";
+    }
+}
+
 function renderSearchableSelectOptions(state) {
-    const searchTerm = state.searchInput.value.trim().toLowerCase();
+    const searchTerm = state.hasSearch
+        ? state.searchInput.value.trim().toLowerCase()
+        : "";
     const currentValue = String(state.select.value ?? "");
     const options = getSearchableSelectOptions(state.select).filter(option => {
         if (!searchTerm) {
@@ -482,10 +999,20 @@ function openSearchableSelect(state) {
     state.trigger.setAttribute("aria-expanded", "true");
     state.suppressOutsideCloseUntil = getSearchableSelectNow() + 180;
     renderSearchableSelectOptions(state);
+    window.requestAnimationFrame(() => {
+        sizeSearchableSelectMenu(state);
+    });
 
     window.setTimeout(() => {
-        state.searchInput.focus();
-        state.searchInput.select();
+        if (state.hasSearch) {
+            state.searchInput.focus();
+            state.searchInput.select();
+            return;
+        }
+
+        const selectedOption = state.optionsContainer.querySelector(".hcm-searchable-select__option.is-selected:not(.is-disabled)");
+        const firstOption = state.optionsContainer.querySelector(".hcm-searchable-select__option:not(.is-disabled)");
+        (selectedOption || firstOption)?.focus();
     }, 0);
 }
 
@@ -495,8 +1022,15 @@ function refreshSearchableSelect(select) {
         return;
     }
 
+    syncSearchableSelectSearchMode(state);
     updateSearchableSelectTrigger(state);
     renderSearchableSelectOptions(state);
+
+    if (state.root.classList.contains("is-open")) {
+        window.requestAnimationFrame(() => {
+            sizeSearchableSelectMenu(state);
+        });
+    }
 }
 
 function destroySearchableSelect(select) {
@@ -536,6 +1070,12 @@ function bindSearchableSelectEvents() {
         }
     });
 
+    window.addEventListener("resize", () => {
+        searchableSelectStates.forEach(state => {
+            sizeSearchableSelectMenu(state);
+        });
+    });
+
     searchableSelectEventsBound = true;
 }
 
@@ -546,8 +1086,13 @@ function enhanceSearchableSelect(select, options = {}) {
 
     const existingState = searchableSelectRegistry.get(select);
     if (existingState) {
-        existingState.searchInput.placeholder = options.searchPlaceholder || "Search options";
+        existingState.enhancementOptions = {
+            ...existingState.enhancementOptions,
+            ...options,
+        };
+        existingState.searchInput.placeholder = existingState.enhancementOptions.searchPlaceholder || "Search options";
         existingState.keepOpenOnSelect = options.keepOpenOnSelect !== false;
+        syncSearchableSelectSearchMode(existingState);
         refreshSearchableSelect(select);
         return existingState;
     }
@@ -605,9 +1150,13 @@ function enhanceSearchableSelect(select, options = {}) {
         root,
         trigger,
         triggerLabel,
+        menu,
+        searchWrap,
         searchInput,
         optionsContainer,
+        enhancementOptions: { ...options },
         keepOpenOnSelect: options.keepOpenOnSelect !== false,
+        hasSearch: true,
         suppressOutsideCloseUntil: 0,
     };
 
@@ -675,7 +1224,14 @@ function enhanceSearchableSelect(select, options = {}) {
             renderSearchableSelectOptions(state);
             window.setTimeout(() => {
                 if (state.root.classList.contains("is-open")) {
-                    state.searchInput.focus({ preventScroll: true });
+                    if (state.hasSearch) {
+                        state.searchInput.focus({ preventScroll: true });
+                        return;
+                    }
+
+                    const selectedOption = state.optionsContainer.querySelector(".hcm-searchable-select__option.is-selected:not(.is-disabled)");
+                    const firstOption = state.optionsContainer.querySelector(".hcm-searchable-select__option:not(.is-disabled)");
+                    (selectedOption || firstOption)?.focus();
                 }
             }, 0);
             return;
@@ -699,6 +1255,7 @@ function enhanceSearchableSelect(select, options = {}) {
     }
 
     bindSearchableSelectEvents();
+    syncSearchableSelectSearchMode(state);
     refreshSearchableSelect(select);
 
     return state;
@@ -710,6 +1267,14 @@ function initializeSearchableSelects(root = document, options = {}) {
     }
 
     root.querySelectorAll(options.selector || "select").forEach(select => {
+        if (options.searchCategory && !select.dataset.searchCategory) {
+            select.dataset.searchCategory = options.searchCategory;
+        }
+
+        if (options.minSearchOptions !== undefined && !select.dataset.minSearchOptions) {
+            select.dataset.minSearchOptions = String(options.minSearchOptions);
+        }
+
         enhanceSearchableSelect(select, options);
     });
 }
@@ -748,6 +1313,10 @@ function searchableDropdownEditor(cell, onRendered, success, cancel, editorParam
     const initialValue = select.value;
     const state = enhanceSearchableSelect(select, {
         searchPlaceholder,
+        placeholder,
+        searchable: editorParams.searchable,
+        searchCategory: editorParams.searchCategory,
+        minSearchOptions: editorParams.minSearchOptions,
         keepOpenOnSelect: true,
     });
     let finished = false;

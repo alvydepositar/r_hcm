@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from employee_modules.models import Employee
-from core.models import Division
+from core.models import Division, EmployeeLeaveCredit, LeaveApplication
 
 # Dashboard Views
 def employee_management(request):
@@ -14,7 +14,18 @@ def employee_management(request):
     return render(request, 'employee_management.html', context)
 
 def leave_management(request):
-    return render(request, 'leave_management.html')
+    total_leave_requests = LeaveApplication.objects.count()
+    approved_leaves = LeaveApplication.objects.filter(status=LeaveApplication.Status.APPROVED).count()
+    pending_leaves = LeaveApplication.objects.filter(status=LeaveApplication.Status.SUBMITTED).count()
+    leave_credit_records = EmployeeLeaveCredit.objects.count()
+
+    context = {
+        'total_leave_requests': total_leave_requests,
+        'approved_leaves': approved_leaves,
+        'pending_leaves': pending_leaves,
+        'leave_credit_records': leave_credit_records,
+    }
+    return render(request, 'leave_management.html', context)
 
 def oba_management(request):
     return render(request, 'oba_management.html')
@@ -28,6 +39,18 @@ def employee_info(request):
 
 def personal_data_sheet(request):
     return render(request, 'employee/personal_data_sheet.html')
+
+
+def leave_types(request):
+    return render(request, 'leave/leave_types.html')
+
+
+def employee_leave_credits(request):
+    return render(request, 'leave/employee_leave_credits.html')
+
+
+def leave_applications(request):
+    return render(request, 'leave/leave_applications.html')
 
 # Core Views
 def divisions(request):

@@ -22,6 +22,90 @@ const approverEditableFields = [
     "alt_hr_approver",
 ];
 
+function getApproverViewFields(type) {
+    return [
+        {
+            label: type === "division" ? "Division" : "Employee",
+            field: getTargetField(type),
+            format: ({ value }) => type === "division"
+                ? formatDivisionReference(value)
+                : formatEmployeeReference(value),
+        },
+        {
+            label: "Immediate Supervisor",
+            field: "immediate_supervisor",
+            format: ({ value }) => formatEmployeeReference(value),
+        },
+        {
+            label: "Alt Supervisor",
+            field: "alt_supervisor",
+            format: ({ value }) => formatEmployeeReference(value),
+        },
+        {
+            label: "Division Chief",
+            field: "division_chief",
+            format: ({ value }) => formatEmployeeReference(value),
+        },
+        {
+            label: "Alt Division Chief",
+            field: "alt_division_chief",
+            format: ({ value }) => formatEmployeeReference(value),
+        },
+        {
+            label: "HR Approver",
+            field: "hr_approver",
+            format: ({ value }) => formatEmployeeReference(value),
+        },
+        {
+            label: "Alt HR Approver",
+            field: "alt_hr_approver",
+            format: ({ value }) => formatEmployeeReference(value),
+        },
+    ];
+}
+
+function viewApproverRow(type, row) {
+    showTableRowView({
+        title: rowData => type === "division"
+            ? `Division Approvers: ${formatDivisionReference(rowData.division_id)}`
+            : `Employee Approvers: ${formatEmployeeReference(rowData.employee_id)}`,
+        subtitle: type === "division"
+            ? "Configured Division Approval Chain"
+            : "Configured Employee Approval Chain",
+        rowData: row.getData(),
+        fields: getApproverViewFields(type),
+        onDelete: () => deleteApprover(row, type),
+        editLabel: "Edit Row",
+        deleteLabel: "Delete Row",
+        editConfig: {
+            editableFields: [
+                getTargetField(type),
+                ...approverEditableFields.filter(field => !["division_id", "employee_id"].includes(field)),
+            ],
+            getFieldDefinition: field => getTableByType(type)?.getColumn(field)?.getDefinition() || null,
+            onStartEdit: () => {
+                const state = getEditingState(type);
+                if (state.mode) {
+                    alert("Save or cancel the current edits before editing from the modal.");
+                    return false;
+                }
+
+                return true;
+            },
+            onSave: async ({ originalData, draftData }) => {
+                const payload = buildApproverPayloadFromData(type, originalData, draftData);
+                if (!Object.keys(payload).length) {
+                    return cloneRowData(row.getData());
+                }
+
+                const updated = await patchApprover(row.getData().approver_id, payload);
+                await Promise.resolve(row.update(updated));
+                return cloneRowData(row.getData());
+            },
+        },
+    });
+}
+
 const editAllRowsButton = document.getElementById("edit-all-rows-btn");
 const saveAllRowsButton = document.getElementById("save-all-rows-btn");
 const cancelAllRowsButton = document.getElementById("cancel-all-rows-btn");
@@ -142,13 +226,22 @@ function getOriginalRowData(type, rowId) {
 function buildApproverPayload(type, row) {
     const rowData = row.getData();
     const originalData = getOriginalRowData(type, rowData.approver_id);
-    const payload = {};
 
     if (!originalData) {
-        return payload;
+        return {};
     }
 
-    approverEditableFields.forEach(field => {
+    return buildApproverPayloadFromData(type, originalData, rowData);
+}
+
+function buildApproverPayloadFromData(type, originalData, rowData) {
+    const payload = {};
+    const relevantFields = [
+        getTargetField(type),
+        ...approverEditableFields.filter(field => !["division_id", "employee_id"].includes(field)),
+    ];
+
+    relevantFields.forEach(field => {
         const originalValue = normalizeApproverFieldValue(field, originalData[field] ?? null);
         const currentValue = normalizeApproverFieldValue(field, rowData[field] ?? null);
 
@@ -340,6 +433,7 @@ function getEmployeeEditorParams(clearable = true) {
         clearable,
         placeholder: "Select employee",
         searchPlaceholder: "Search employees",
+        searchCategory: "person",
     });
 }
 
@@ -425,28 +519,41 @@ function approverColumns(type) {
         {
             title: "Actions",
             headerSort: false,
-            width: 250,
+            width: 190,
             hozAlign: "center",
             formatter: cell => {
                 const state = getEditingState(type);
                 const editing = isEditingRow(type, cell.getRow().getData());
+                const iconButton = (className, variant, icon, label) => `
+                    <button
+                        class="btn btn-sm ${variant} hcm-table-action-btn ${className}"
+                        type="button"
+                        title="${label}"
+                        aria-label="${label}"
+                    >
+                        <i class="${icon}" aria-hidden="true"></i>
+                        <span class="visually-hidden">${label}</span>
+                    </button>
+                `;
 
                 if (state.mode === "all") {
                     return `
-                        <div class="d-flex gap-1 justify-content-center">
+                        <div class="d-flex gap-1 justify-content-center align-items-center hcm-table-actions">
+                            ${iconButton("approver-view", "btn-outline-secondary", "ti ti-eye", "View")}
                             <span class="badge text-bg-light align-self-center">Editing</span>
-                            <button class="btn btn-sm btn-danger approver-delete">Delete</button>
+                            ${iconButton("approver-delete", "btn-danger", "ti ti-trash", "Delete")}
                         </div>
                     `;
                 }
 
                 return `
-                    <div class="d-flex gap-1 justify-content-center">
-                        <button class="btn btn-sm ${editing ? "btn-success approver-save" : "btn-primary approver-edit"}">
-                            ${editing ? "Save" : "Edit"}
-                        </button>
-                        ${editing ? '<button class="btn btn-sm btn-secondary approver-cancel">Cancel</button>' : ""}
-                        <button class="btn btn-sm btn-danger approver-delete">Delete</button>
+                    <div class="d-flex gap-1 justify-content-center align-items-center hcm-table-actions">
+                        ${iconButton("approver-view", "btn-outline-secondary", "ti ti-eye", "View")}
+                        ${editing
+                            ? iconButton("approver-save", "btn-success", "ti ti-device-floppy", "Save")
+                            : iconButton("approver-edit", "btn-primary", "ti ti-pencil", "Edit")}
+                        ${editing ? iconButton("approver-cancel", "btn-secondary", "ti ti-x", "Cancel") : ""}
+                        ${iconButton("approver-delete", "btn-danger", "ti ti-trash", "Delete")}
                     </div>
                 `;
             },
@@ -457,6 +564,11 @@ function approverColumns(type) {
                 }
 
                 const row = cell.getRow();
+
+                if (button.classList.contains("approver-view")) {
+                    viewApproverRow(type, row);
+                    return;
+                }
 
                 if (button.classList.contains("approver-edit")) {
                     enterEditMode(type, row);
@@ -573,8 +685,16 @@ function patchApprover(id, payload) {
 
 async function performApproverDelete(row, type, { skipConfirm = false } = {}) {
     const data = row.getData();
-    if (!skipConfirm && !confirm("Delete this approver?")) {
-        return;
+    if (!skipConfirm) {
+        const confirmed = await showSystemConfirm("Delete this approver?", {
+            title: "Delete Approver?",
+            confirmLabel: "Delete",
+            tone: "danger",
+        });
+
+        if (!confirmed) {
+            return;
+        }
     }
 
     const res = await fetch(`/api/approvers/${data.approver_id}/`, {
@@ -626,7 +746,16 @@ async function deleteSelectedApprovers() {
         return;
     }
 
-    if (!confirm(`Delete ${rows.length} selected approver${rows.length === 1 ? "" : "s"}?`)) {
+    const confirmed = await showSystemConfirm(
+        `Delete ${rows.length} selected approver${rows.length === 1 ? "" : "s"}?`,
+        {
+            title: "Delete Selected Approvers?",
+            confirmLabel: "Delete",
+            tone: "danger",
+        }
+    );
+
+    if (!confirmed) {
         return;
     }
 
@@ -668,6 +797,22 @@ const modal = new bootstrap.Modal(approverModalElement);
 Promise.all([loadEmployees(), loadDivisions()])
     .then(() => {
         populateApproverModalOptions();
+
+        [
+            "add-employee",
+            "add-immediate-supervisor",
+            "add-alt-supervisor",
+            "add-division-chief",
+            "add-alt-division-chief",
+            "add-hr-approver",
+            "add-alt-hr-approver",
+        ].forEach(selectId => {
+            const select = document.getElementById(selectId);
+            if (select) {
+                select.dataset.searchCategory = "person";
+            }
+        });
+
         initializeSearchableSelects(approverModalElement, {
             selector: "select",
             searchPlaceholder: "Search records",

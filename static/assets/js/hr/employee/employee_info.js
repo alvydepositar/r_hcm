@@ -17,6 +17,22 @@ function populateLookupSelect(select, options, placeholder) {
 
 Promise.all([loadDivisions(), loadPositions()])
     .then(() => {
+        const employeeViewFields = [
+            { label: "Employee ID", field: "employee_id" },
+            { label: "First Name", field: "first_name" },
+            { label: "Last Name", field: "last_name" },
+            {
+                label: "Position",
+                field: "position",
+                format: ({ value }) => formatPositionReference(value),
+            },
+            {
+                label: "Division",
+                field: "division",
+                format: ({ value }) => formatDivisionReference(value),
+            },
+        ];
+
         const employeeRowEditor = createTableRowEditor({
             primaryKey: "id",
             editableFields: [
@@ -26,6 +42,9 @@ Promise.all([loadDivisions(), loadPositions()])
                 "position",
                 "division",
             ],
+            viewFields: employeeViewFields,
+            getViewTitle: rowData => `Employee Record: ${rowData.first_name} ${rowData.last_name}`,
+            getViewSubtitle: rowData => `Employee No. ${rowData.employee_id}`,
             patchUrlBase: "/api/employees/",
             deleteUrlBase: "/api/employees/",
             deleteConfirmMessage: "Delete this employee?",
@@ -99,7 +118,7 @@ Promise.all([loadDivisions(), loadPositions()])
                     formatter: cell => formatDivisionReference(cell.getValue()),
                     headerSort: true,
                 },
-                employeeRowEditor.buildActionsColumn(),
+                employeeRowEditor.buildActionsColumn({ width: 190 }),
             ],
         });
 

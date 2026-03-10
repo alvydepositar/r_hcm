@@ -910,7 +910,11 @@ async function deletePds() {
         return;
     }
 
-    const confirmed = confirm("Delete this personal data sheet?");
+    const confirmed = await showSystemConfirm("Delete this personal data sheet?", {
+        title: "Delete Personal Data Sheet?",
+        confirmLabel: "Delete",
+        tone: "danger",
+    });
     if (!confirmed) {
         return;
     }
@@ -968,6 +972,7 @@ function buildEmployeeOptions() {
 Promise.all([loadEmployees()]).then(() => {
     const employeeSelect = document.getElementById("pds-employee-select");
     populateLookupSelect(employeeSelect, buildEmployeeOptions(), "Select employee");
+    employeeSelect.dataset.searchCategory = "person";
     initializeSearchableSelects(document.getElementById("pds-page"), {
         selector: "#pds-employee-select",
         searchPlaceholder: "Search employees",

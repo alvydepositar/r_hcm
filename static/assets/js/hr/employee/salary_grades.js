@@ -16,6 +16,14 @@ const salaryCurrencyFormatter = new Intl.NumberFormat("en-PH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
 });
+const salaryGradeViewFields = [
+    { label: "Salary Grade", field: "csc_grade" },
+    ...salaryStepFields.map((field, index) => ({
+        label: `Step ${index + 1}`,
+        field,
+        format: ({ value }) => formatSalaryAmount(value),
+    })),
+];
 
 function parseSalaryGradeValue(value) {
     if (value === null || value === undefined || value === "") {
@@ -60,6 +68,9 @@ const salaryGradeRowEditor = createTableRowEditor({
         "csc_grade",
         ...salaryStepFields,
     ],
+    viewFields: salaryGradeViewFields,
+    getViewTitle: rowData => `Salary Grade ${rowData.csc_grade}`,
+    getViewSubtitle: "CSC Salary Matrix Record",
     patchUrlBase: "/api/salary_grades/",
     deleteUrlBase: "/api/salary_grades/",
     deleteConfirmMessage: "Delete this salary grade row?",
@@ -116,7 +127,7 @@ const salaryGradeFactory = new tableFactory({
             editor: "input",
             formatter: cell => formatSalaryAmount(cell.getValue()),
         })),
-        salaryGradeRowEditor.buildActionsColumn({ width: 250 }),
+        salaryGradeRowEditor.buildActionsColumn({ width: 190 }),
     ],
 });
 

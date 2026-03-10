@@ -5,6 +5,55 @@ const plantillaCurrencyFormatter = new Intl.NumberFormat("en-PH", {
     maximumFractionDigits: 2,
 });
 
+const plantillaAvailabilityOptions = [
+    { value: "vacant", label: "Vacant" },
+    { value: "filled", label: "Filled" },
+];
+const plantillaAvailabilityLookup = new Map(
+    plantillaAvailabilityOptions.map(option => [option.value, option.label]),
+);
+const plantillaViewFields = [
+    { label: "Plantilla Item No.", field: "item_number" },
+    {
+        label: "Position Title",
+        field: "position",
+        format: ({ value }) => formatPositionReference(value),
+    },
+    {
+        label: "Place of Assignment",
+        field: "division",
+        format: ({ value }) => formatDivisionReference(value),
+    },
+    {
+        label: "Availability",
+        field: "availability_status",
+        format: ({ value }) => plantillaAvailabilityLookup.get(value) || value || "",
+    },
+    {
+        label: "Salary Grade",
+        field: "salary_grade",
+        format: ({ rowData }) => {
+            const grade = rowData.position_standard_csc_grade ?? rowData.csc_grade;
+            return grade ? `SG ${grade}` : "";
+        },
+    },
+    {
+        label: "Salary Step",
+        field: "salary_step",
+        format: ({ value }) => value ? `Step ${value}` : "",
+    },
+    {
+        label: "Monthly Salary",
+        field: "monthly_salary",
+        format: ({ value }) => formatPlantillaCurrency(value),
+    },
+    {
+        label: "Annual Salary",
+        field: "annual_salary",
+        format: ({ value }) => formatPlantillaCurrency(value),
+    },
+];
+
 function formatPlantillaCurrency(value) {
     if (value === null || value === undefined || value === "") {
         return "";
@@ -27,26 +76,9 @@ function parsePlantillaStepValue(value) {
     return Number.isNaN(parsed) ? null : parsed;
 }
 
-function buildPlantillaDerivedFields(rowData) {
-    const salaryGradeRecord = getSalaryGradeRecord(rowData.salary_grade);
-    const availableStepOptions = getSalaryStepOptionsForGrade(rowData.salary_grade);
-    const parsedStep = parsePlantillaStepValue(rowData.salary_step);
-    const validStep = availableStepOptions.some(option => option.value === parsedStep)
-        ? parsedStep
-        : (availableStepOptions[0]?.value ?? null);
-    const monthlySalary = validStep
-        ? getSalaryAmountForStep(rowData.salary_grade, validStep)
-        : null;
-    const annualSalary = monthlySalary === null || monthlySalary === undefined
-        ? null
-        : (Number.parseFloat(monthlySalary) * 12).toFixed(2);
-
-    return {
-        salary_step: validStep,
-        csc_grade: salaryGradeRecord?.csc_grade ?? null,
-        monthly_salary: monthlySalary,
-        annual_salary: annualSalary,
-    };
+function getPositionStandardSalaryGradeValue(positionValue) {
+    const positionRecord = getPositionRecord(positionValue);
+    return positionRecord?.standard_salary_grade ?? null;
 }
 
 function buildPlantillaListEditorParams(options, clearable = false) {
@@ -57,8 +89,46 @@ function buildPlantillaListEditorParams(options, clearable = false) {
     });
 }
 
+function buildAvailabilityBadge(value) {
+    if (value === "filled") {
+        return '<span class="badge text-bg-secondary">Filled</span>';
+    }
+
+    return '<span class="badge text-bg-success">Vacant</span>';
+}
+
+function buildPlantillaDerivedFields(rowData) {
+    const positionRecord = getPositionRecord(rowData.position);
+    const positionSalaryGradeValue = positionRecord?.standard_salary_grade ?? null;
+    const effectiveSalaryGrade = positionSalaryGradeValue || resolveSalaryGradeReference(rowData.salary_grade);
+    const salaryGradeRecord = getSalaryGradeRecord(effectiveSalaryGrade);
+    const availableStepOptions = getSalaryStepOptionsForGrade(effectiveSalaryGrade);
+    const parsedStep = parsePlantillaStepValue(rowData.salary_step);
+    const validStep = availableStepOptions.some(option => option.value === parsedStep)
+        ? parsedStep
+        : (availableStepOptions[0]?.value ?? null);
+    const monthlySalary = validStep
+        ? getSalaryAmountForStep(effectiveSalaryGrade, validStep)
+        : null;
+    const annualSalary = monthlySalary === null || monthlySalary === undefined
+        ? null
+        : (Number.parseFloat(monthlySalary) * 12).toFixed(2);
+
+    return {
+        salary_grade: effectiveSalaryGrade,
+        position_standard_salary_grade: positionSalaryGradeValue,
+        position_standard_csc_grade: positionRecord?.standard_csc_grade ?? null,
+        csc_grade: salaryGradeRecord?.csc_grade ?? null,
+        salary_step: validStep,
+        monthly_salary: monthlySalary,
+        annual_salary: annualSalary,
+    };
+}
+
 Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
     .then(() => {
+        let vacanciesOnly = false;
+
         const plantillaRowEditor = createTableRowEditor({
             primaryKey: "plantilla_id",
             editableFields: [
@@ -67,11 +137,26 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
                 "division",
                 "salary_grade",
                 "salary_step",
+                "availability_status",
             ],
+            viewFields: plantillaViewFields,
+            getViewTitle: rowData => `CSC Plantilla Item: ${rowData.item_number}`,
+            getViewSubtitle: rowData => formatPositionReference(rowData.position),
             patchUrlBase: "/api/csc-plantilla/",
             deleteUrlBase: "/api/csc-plantilla/",
             deleteConfirmMessage: "Delete this plantilla item?",
             bulkDeleteConfirmMessage: "Delete the selected plantilla items?",
+            prepareModalRowData: rowData => ({
+                ...rowData,
+                ...buildPlantillaDerivedFields(rowData),
+            }),
+            isModalFieldEditable: ({ field, rowData }) => {
+                if (field === "salary_grade") {
+                    return !getPositionStandardSalaryGradeValue(rowData.position);
+                }
+
+                return true;
+            },
             serializeFieldValue: ({ field, value }) => {
                 if (field === "position") {
                     return resolvePositionReference(value);
@@ -102,7 +187,7 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
             primaryKey: "plantilla_id",
             autoSaveEdits: false,
             onCellEdited: cell => {
-                if (!["salary_grade", "salary_step"].includes(cell.getField())) {
+                if (!["position", "salary_grade", "salary_step"].includes(cell.getField())) {
                     return;
                 }
 
@@ -133,7 +218,7 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
                     editorParams: () => buildPlantillaListEditorParams(positionState.options, false),
                     formatter: cell => formatPositionReference(cell.getValue()),
                     headerSort: true,
-                    width: 220,
+                    width: 230,
                 },
                 {
                     title: "Place of Assignment",
@@ -146,13 +231,32 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
                     width: 220,
                 },
                 {
-                    title: "Salary Grade",
-                    field: "salary_grade",
+                    title: "Availability",
+                    field: "availability_status",
                     editable: cell => plantillaRowEditor.isEditingRow(cell.getRow().getData()),
+                    editor: searchableDropdownEditor,
+                    editorParams: () => buildPlantillaListEditorParams(plantillaAvailabilityOptions, false),
+                    formatter: cell => buildAvailabilityBadge(cell.getValue()),
+                    headerSort: true,
+                    width: 150,
+                    hozAlign: "center",
+                },
+                {
+                    title: "Standard SG",
+                    field: "salary_grade",
+                    editable: cell => {
+                        const rowData = cell.getRow().getData();
+                        const positionSalaryGrade = getPositionStandardSalaryGradeValue(rowData.position);
+                        return plantillaRowEditor.isEditingRow(rowData) && !positionSalaryGrade;
+                    },
                     editor: searchableDropdownEditor,
                     editorParams: () => buildPlantillaListEditorParams(salaryGradeState.options, false),
                     formatter: cell => {
                         const rowData = cell.getRow().getData();
+                        if (rowData.position_standard_csc_grade !== null && rowData.position_standard_csc_grade !== undefined) {
+                            return `SG ${rowData.position_standard_csc_grade}`;
+                        }
+
                         if (rowData.csc_grade !== null && rowData.csc_grade !== undefined) {
                             return `SG ${rowData.csc_grade}`;
                         }
@@ -194,7 +298,7 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
                     width: 180,
                     hozAlign: "right",
                 },
-                plantillaRowEditor.buildActionsColumn({ width: 250 }),
+                plantillaRowEditor.buildActionsColumn({ width: 190 }),
             ],
         });
 
@@ -211,6 +315,24 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
             document.getElementById("delete-selected-csc-plantilla-btn")
         );
 
+        function refreshPlantillaData() {
+            const url = vacanciesOnly
+                ? "/api/csc-plantilla/?availability_status=vacant"
+                : "/api/csc-plantilla/";
+            return plantillaTable.setData(url);
+        }
+
+        const toggleVacanciesButton = document.getElementById("toggle-csc-vacancies-btn");
+        toggleVacanciesButton.addEventListener("click", async () => {
+            vacanciesOnly = !vacanciesOnly;
+            toggleVacanciesButton.classList.toggle("btn-warning", vacanciesOnly);
+            toggleVacanciesButton.classList.toggle("btn-outline-warning", !vacanciesOnly);
+            toggleVacanciesButton.innerHTML = vacanciesOnly
+                ? '<i class="ti ti-list"></i> Show All Items'
+                : '<i class="ti ti-filter"></i> Show Vacancies Only';
+            await refreshPlantillaData();
+        });
+
         const plantillaModalElement = document.getElementById("addCSCPlantillaModal");
         const plantillaModal = new bootstrap.Modal(plantillaModalElement);
         const plantillaForm = document.getElementById("add-csc-plantilla-form");
@@ -219,6 +341,7 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
         const divisionSelect = document.getElementById("add-division");
         const salaryGradeSelect = document.getElementById("add-salary-grade");
         const salaryStepSelect = document.getElementById("add-salary-step");
+        const availabilityStatusSelect = document.getElementById("add-availability-status");
         const monthlySalaryInput = document.getElementById("add-monthly-salary");
         const annualSalaryInput = document.getElementById("add-annual-salary");
 
@@ -252,6 +375,32 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
             syncPlantillaModalCompensation();
         }
 
+        function syncPlantillaSalaryGradeFromPosition({ resetValue = false } = {}) {
+            const positionSalaryGradeValue = getPositionStandardSalaryGradeValue(positionSelect.value);
+
+            if (positionSalaryGradeValue) {
+                const mappedOption = salaryGradeState.options.filter(
+                    option => String(option.value) === String(positionSalaryGradeValue)
+                );
+                populateLookupSelect(salaryGradeSelect, mappedOption, "Select salary grade");
+                salaryGradeSelect.value = String(positionSalaryGradeValue);
+                salaryGradeSelect.disabled = true;
+            } else if (positionSelect.value) {
+                populateLookupSelect(salaryGradeSelect, salaryGradeState.options, "Select salary grade");
+                salaryGradeSelect.disabled = false;
+                if (resetValue) {
+                    salaryGradeSelect.value = "";
+                }
+            } else {
+                populateLookupSelect(salaryGradeSelect, [], "Select salary grade");
+                salaryGradeSelect.value = "";
+                salaryGradeSelect.disabled = true;
+            }
+
+            refreshSearchableSelect(salaryGradeSelect);
+            syncPlantillaStepOptions({ resetValue: true });
+        }
+
         initializeSearchableSelects(plantillaModalElement, {
             selector: "select",
             searchPlaceholder: "Search records",
@@ -266,12 +415,20 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
             plantillaForm.reset();
             populateLookupSelect(positionSelect, positionState.options, "Select position");
             populateLookupSelect(divisionSelect, divisionState.options, "Select division");
-            populateLookupSelect(salaryGradeSelect, salaryGradeState.options, "Select salary grade");
+            populateLookupSelect(salaryGradeSelect, [], "Select salary grade");
             populateLookupSelect(salaryStepSelect, [], "Select salary step");
+            availabilityStatusSelect.value = "vacant";
+            refreshSearchableSelect(availabilityStatusSelect);
+            salaryGradeSelect.disabled = true;
+            refreshSearchableSelect(salaryGradeSelect);
             monthlySalaryInput.value = "";
             annualSalaryInput.value = "";
             itemNumberInput.focus();
             plantillaModal.show();
+        });
+
+        positionSelect.addEventListener("change", () => {
+            syncPlantillaSalaryGradeFromPosition({ resetValue: true });
         });
 
         salaryGradeSelect.addEventListener("change", () => {
@@ -297,6 +454,7 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
                 division: resolveDivisionReference(divisionSelect.value),
                 salary_grade: resolveSalaryGradeReference(salaryGradeSelect.value),
                 salary_step: parsePlantillaStepValue(salaryStepSelect.value),
+                availability_status: availabilityStatusSelect.value || "vacant",
             };
 
             if (!payload.item_number || !payload.position || !payload.division || !payload.salary_grade || !payload.salary_step) {
@@ -323,7 +481,7 @@ Promise.all([loadDivisions(), loadPositions(), loadSalaryGrades()])
                 monthlySalaryInput.value = "";
                 annualSalaryInput.value = "";
                 plantillaRowEditor.reset();
-                plantillaTable.replaceData();
+                await refreshPlantillaData();
             } catch (err) {
                 alert(err.message);
             }

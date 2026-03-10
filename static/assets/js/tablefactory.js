@@ -183,6 +183,477 @@ class tableFactory {
     }
 }
 
+let hcmTableRowViewDialog = null;
+
+function getTableRowViewDialog() {
+    if (hcmTableRowViewDialog) {
+        return hcmTableRowViewDialog;
+    }
+
+    const element = document.createElement("div");
+    element.className = "modal fade";
+    element.id = "hcmTableRowViewModal";
+    element.tabIndex = -1;
+    element.setAttribute("aria-hidden", "true");
+    element.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content hcm-record-sheet-modal">
+                <div class="modal-header border-0 pb-0">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-0">
+                    <div class="hcm-record-sheet">
+                        <div class="hcm-record-sheet__masthead">
+                            <div class="hcm-record-sheet__heading">
+                                <div class="hcm-record-sheet__eyebrow">Official Record View</div>
+                                <h3 class="hcm-record-sheet__title mb-0">Record Details</h3>
+                                <div class="hcm-record-sheet__subtitle"></div>
+                            </div>
+                        </div>
+                        <div class="hcm-record-sheet__section">
+                            <div class="hcm-record-sheet__section-title">Form Details</div>
+                            <div class="hcm-record-sheet__grid"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <div class="hcm-record-sheet__actions">
+                        <button type="button" class="btn btn-outline-primary hcm-record-sheet__action-edit d-none">
+                            Edit Record
+                        </button>
+                        <button type="button" class="btn btn-primary hcm-record-sheet__action-save d-none">
+                            Save Changes
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary hcm-record-sheet__action-cancel d-none">
+                            Cancel Edit
+                        </button>
+                        <button type="button" class="btn btn-outline-danger hcm-record-sheet__action-delete d-none">
+                            Delete Record
+                        </button>
+                        <button type="button" class="btn btn-light hcm-record-sheet__action-close" data-bs-dismiss="modal">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(element);
+
+    hcmTableRowViewDialog = {
+        element,
+        modal: new bootstrap.Modal(element),
+        title: element.querySelector(".hcm-record-sheet__title"),
+        subtitle: element.querySelector(".hcm-record-sheet__subtitle"),
+        grid: element.querySelector(".hcm-record-sheet__grid"),
+        editButton: element.querySelector(".hcm-record-sheet__action-edit"),
+        deleteButton: element.querySelector(".hcm-record-sheet__action-delete"),
+        saveButton: element.querySelector(".hcm-record-sheet__action-save"),
+        cancelButton: element.querySelector(".hcm-record-sheet__action-cancel"),
+        closeButton: element.querySelector(".hcm-record-sheet__action-close"),
+        enhancedSelects: new Set(),
+        state: null,
+    };
+
+    element.addEventListener("hidden.bs.modal", () => {
+        if (typeof destroySearchableSelect === "function") {
+            hcmTableRowViewDialog.enhancedSelects.forEach(select => destroySearchableSelect(select));
+        }
+
+        hcmTableRowViewDialog.enhancedSelects.clear();
+        hcmTableRowViewDialog.grid.innerHTML = "";
+        hcmTableRowViewDialog.state = null;
+        hcmTableRowViewDialog.editButton.onclick = null;
+        hcmTableRowViewDialog.deleteButton.onclick = null;
+        hcmTableRowViewDialog.saveButton.onclick = null;
+        hcmTableRowViewDialog.cancelButton.onclick = null;
+    });
+
+    return hcmTableRowViewDialog;
+}
+
+function stringifyTableViewValue(value) {
+    if (value === null || value === undefined || value === "") {
+        return "Not set";
+    }
+
+    if (Array.isArray(value) || (value && typeof value === "object")) {
+        try {
+            return JSON.stringify(value, null, 2);
+        } catch (err) {
+            console.error("Failed to stringify row view value:", err);
+            return String(value);
+        }
+    }
+
+    return String(value);
+}
+
+function cloneTableRowViewData(rowData) {
+    return JSON.parse(JSON.stringify(rowData || {}));
+}
+
+function runTableRowViewAction(dialog, action) {
+    if (typeof action !== "function") {
+        return;
+    }
+
+    const handleHidden = () => {
+        action();
+    };
+
+    dialog.element.addEventListener("hidden.bs.modal", handleHidden, { once: true });
+    dialog.modal.hide();
+}
+
+function getTableRowViewFieldKey(fieldConfig) {
+    return fieldConfig.editField || fieldConfig.field || null;
+}
+
+function resolveTableRowViewRawValue(fieldConfig, rowData) {
+    if (typeof fieldConfig.value === "function") {
+        return fieldConfig.value(rowData);
+    }
+
+    return rowData[fieldConfig.field];
+}
+
+function formatTableRowViewDisplayValue(fieldConfig, rowData) {
+    const rawValue = resolveTableRowViewRawValue(fieldConfig, rowData);
+    return typeof fieldConfig.format === "function"
+        ? fieldConfig.format({ rowData, value: rawValue })
+        : stringifyTableViewValue(rawValue);
+}
+
+function getTableRowViewCellProxy(fieldKey, rowData) {
+    return {
+        getField: () => fieldKey,
+        getValue: () => rowData[fieldKey],
+        getRow: () => ({
+            getData: () => rowData,
+        }),
+    };
+}
+
+function getTableRowViewPreparedData(dialog, rowData) {
+    if (typeof dialog.state?.editConfig?.prepareRowData === "function") {
+        return dialog.state.editConfig.prepareRowData(cloneTableRowViewData(rowData));
+    }
+
+    return cloneTableRowViewData(rowData);
+}
+
+function getTableRowViewFieldDefinition(dialog, fieldKey) {
+    if (!fieldKey || typeof dialog.state?.editConfig?.getFieldDefinition !== "function") {
+        return null;
+    }
+
+    return dialog.state.editConfig.getFieldDefinition(fieldKey, dialog.state.draftData) || null;
+}
+
+function isTableRowViewEditable(dialog, fieldConfig) {
+    const fieldKey = getTableRowViewFieldKey(fieldConfig);
+    if (!fieldKey || dialog.state?.mode !== "edit") {
+        return false;
+    }
+
+    const editableFields = dialog.state?.editConfig?.editableFields || [];
+    if (!editableFields.includes(fieldKey)) {
+        return false;
+    }
+
+    if (typeof dialog.state?.editConfig?.isFieldEditable === "function") {
+        return dialog.state.editConfig.isFieldEditable(fieldKey, dialog.state.draftData) !== false;
+    }
+
+    return true;
+}
+
+function guessTableRowViewInputType(fieldKey, currentValue) {
+    if (/_date$/i.test(fieldKey) || /^\d{4}-\d{2}-\d{2}$/.test(String(currentValue || ""))) {
+        return "date";
+    }
+
+    if (
+        /(time|earliest_|latest_|lunch_)/i.test(fieldKey)
+        || /^\d{2}:\d{2}(:\d{2})?$/.test(String(currentValue || ""))
+    ) {
+        return "time";
+    }
+
+    return "text";
+}
+
+function applyTableRowViewDerivedData(dialog) {
+    if (typeof dialog.state?.editConfig?.prepareRowData !== "function") {
+        return;
+    }
+
+    dialog.state.draftData = dialog.state.editConfig.prepareRowData(
+        cloneTableRowViewData(dialog.state.draftData),
+    );
+}
+
+function buildTableRowViewEditor(dialog, fieldConfig) {
+    const fieldKey = getTableRowViewFieldKey(fieldConfig);
+    const fieldDefinition = getTableRowViewFieldDefinition(dialog, fieldKey) || {};
+    const editor = fieldDefinition.editor || "input";
+    const rawValue = dialog.state.draftData[fieldKey];
+    const wrapper = document.createElement("div");
+    wrapper.className = "hcm-record-sheet__editor";
+
+    const updateDraft = (value, { rerender = false } = {}) => {
+        dialog.state.draftData[fieldKey] = value;
+
+        if (rerender) {
+            applyTableRowViewDerivedData(dialog);
+            renderTableRowView(dialog);
+        }
+    };
+
+    if (editor === searchableDropdownEditor) {
+        const select = document.createElement("select");
+        select.className = "form-select hcm-record-sheet__control";
+
+        const editorParams = typeof fieldDefinition.editorParams === "function"
+            ? (fieldDefinition.editorParams(getTableRowViewCellProxy(fieldKey, dialog.state.draftData)) || {})
+            : (fieldDefinition.editorParams || {});
+        const options = typeof normalizeLookupOptions === "function"
+            ? normalizeLookupOptions(editorParams.values || [])
+            : (editorParams.values || []);
+        const placeholder = editorParams.placeholder || "Select an option";
+
+        const placeholderOption = document.createElement("option");
+        placeholderOption.value = "";
+        placeholderOption.textContent = placeholder;
+        if (!editorParams.clearable) {
+            placeholderOption.disabled = true;
+            placeholderOption.hidden = true;
+        }
+        select.appendChild(placeholderOption);
+
+        options.forEach(option => {
+            const optionElement = document.createElement("option");
+            optionElement.value = String(option.value);
+            optionElement.textContent = option.label ?? String(option.value);
+            select.appendChild(optionElement);
+        });
+
+        select.value = rawValue === null || rawValue === undefined ? "" : String(rawValue);
+        wrapper.appendChild(select);
+
+        if (typeof enhanceSearchableSelect === "function") {
+            enhanceSearchableSelect(select, {
+                placeholder,
+                searchPlaceholder: editorParams.searchPlaceholder || "Search options",
+                searchable: editorParams.searchable,
+                searchCategory: editorParams.searchCategory,
+                minSearchOptions: editorParams.minSearchOptions,
+                keepOpenOnSelect: true,
+            });
+            dialog.enhancedSelects.add(select);
+        }
+
+        select.addEventListener("change", () => {
+            updateDraft(select.value, { rerender: true });
+        });
+
+        return wrapper;
+    }
+
+    if (editor === "textarea") {
+        const textarea = document.createElement("textarea");
+        textarea.className = "form-control hcm-record-sheet__control hcm-record-sheet__control--textarea";
+        textarea.rows = fieldConfig.fullWidth ? 5 : 3;
+        textarea.value = rawValue ?? "";
+        textarea.addEventListener("input", () => {
+            updateDraft(textarea.value);
+        });
+        wrapper.appendChild(textarea);
+        return wrapper;
+    }
+
+    const input = document.createElement("input");
+    input.className = "form-control hcm-record-sheet__control";
+    input.type = guessTableRowViewInputType(fieldKey, rawValue);
+    input.value = rawValue ?? "";
+
+    input.addEventListener("input", () => {
+        updateDraft(input.value);
+    });
+
+    input.addEventListener("change", () => {
+        const shouldRerender = ["date", "time"].includes(input.type);
+        updateDraft(input.value, { rerender: shouldRerender });
+    });
+
+    wrapper.appendChild(input);
+    return wrapper;
+}
+
+function updateTableRowViewActions(dialog) {
+    const state = dialog.state;
+    const isEditMode = state.mode === "edit";
+
+    dialog.editButton.textContent = state.editLabel;
+    dialog.deleteButton.textContent = state.deleteLabel;
+    dialog.saveButton.textContent = state.saveLabel;
+    dialog.cancelButton.textContent = state.cancelLabel;
+
+    dialog.editButton.classList.toggle("d-none", isEditMode || !state.editConfig);
+    dialog.deleteButton.classList.toggle("d-none", isEditMode || typeof state.onDelete !== "function");
+    dialog.saveButton.classList.toggle("d-none", !isEditMode || !state.editConfig);
+    dialog.cancelButton.classList.toggle("d-none", !isEditMode || !state.editConfig);
+    dialog.closeButton.classList.toggle("d-none", isEditMode);
+
+    dialog.editButton.disabled = !!state.saving;
+    dialog.deleteButton.disabled = !!state.saving;
+    dialog.saveButton.disabled = !!state.saving;
+    dialog.cancelButton.disabled = !!state.saving;
+
+    dialog.editButton.onclick = null;
+    dialog.deleteButton.onclick = null;
+    dialog.saveButton.onclick = null;
+    dialog.cancelButton.onclick = null;
+
+    if (!isEditMode && state.editConfig) {
+        dialog.editButton.onclick = () => {
+            if (typeof state.editConfig.onStartEdit === "function" && state.editConfig.onStartEdit() === false) {
+                return;
+            }
+
+            state.mode = "edit";
+            state.draftData = cloneTableRowViewData(state.rowData);
+            applyTableRowViewDerivedData(dialog);
+            renderTableRowView(dialog);
+        };
+    }
+
+    if (!isEditMode && typeof state.onDelete === "function") {
+        dialog.deleteButton.onclick = () => runTableRowViewAction(dialog, state.onDelete);
+    }
+
+    if (isEditMode && state.editConfig) {
+        dialog.cancelButton.onclick = () => {
+            state.mode = "view";
+            state.draftData = cloneTableRowViewData(state.rowData);
+            renderTableRowView(dialog);
+        };
+
+        dialog.saveButton.onclick = async () => {
+            if (state.saving) {
+                return;
+            }
+
+            state.saving = true;
+            updateTableRowViewActions(dialog);
+
+            try {
+                const updatedRow = await state.editConfig.onSave({
+                    originalData: cloneTableRowViewData(state.rowData),
+                    draftData: cloneTableRowViewData(state.draftData),
+                });
+
+                state.rowData = cloneTableRowViewData(updatedRow || state.draftData);
+                state.draftData = cloneTableRowViewData(state.rowData);
+                state.mode = "view";
+            } catch (err) {
+                alert(err.message || "Failed to save changes");
+            } finally {
+                state.saving = false;
+                renderTableRowView(dialog);
+            }
+        };
+    }
+}
+
+function renderTableRowView(dialog) {
+    if (!dialog?.state) {
+        return;
+    }
+
+    if (typeof destroySearchableSelect === "function") {
+        dialog.enhancedSelects.forEach(select => destroySearchableSelect(select));
+    }
+    dialog.enhancedSelects.clear();
+
+    const renderData = dialog.state.mode === "edit"
+        ? getTableRowViewPreparedData(dialog, dialog.state.draftData)
+        : getTableRowViewPreparedData(dialog, dialog.state.rowData);
+
+    dialog.title.textContent = typeof dialog.state.title === "function"
+        ? dialog.state.title(renderData)
+        : (dialog.state.title || "Record Details");
+    dialog.subtitle.textContent = typeof dialog.state.subtitle === "function"
+        ? dialog.state.subtitle(renderData)
+        : (dialog.state.subtitle || "");
+    dialog.subtitle.classList.toggle("d-none", !dialog.subtitle.textContent.trim());
+
+    dialog.grid.innerHTML = "";
+
+    dialog.state.fields.forEach(fieldConfig => {
+        const item = document.createElement("div");
+        item.className = `hcm-record-sheet__field${fieldConfig.fullWidth ? " hcm-record-sheet__field--full" : ""}`;
+
+        const label = document.createElement("div");
+        label.className = "hcm-record-sheet__label";
+        label.textContent = fieldConfig.label;
+
+        item.appendChild(label);
+
+        if (isTableRowViewEditable(dialog, fieldConfig)) {
+            item.classList.add("is-editing");
+            item.appendChild(buildTableRowViewEditor(dialog, fieldConfig));
+        } else {
+            const value = document.createElement("div");
+            value.className = "hcm-record-sheet__value";
+            value.textContent = stringifyTableViewValue(
+                formatTableRowViewDisplayValue(fieldConfig, renderData),
+            );
+            item.appendChild(value);
+        }
+
+        dialog.grid.appendChild(item);
+    });
+
+    updateTableRowViewActions(dialog);
+}
+
+function showTableRowView({
+    title,
+    subtitle = "",
+    rowData,
+    fields = [],
+    onDelete = null,
+    editConfig = null,
+    editLabel = "Edit Record",
+    deleteLabel = "Delete Record",
+    saveLabel = "Save Changes",
+    cancelLabel = "Cancel Edit",
+}) {
+    const dialog = getTableRowViewDialog();
+    dialog.state = {
+        title,
+        subtitle,
+        rowData: cloneTableRowViewData(rowData),
+        draftData: cloneTableRowViewData(rowData),
+        fields,
+        onDelete,
+        editConfig,
+        editLabel,
+        deleteLabel,
+        saveLabel,
+        cancelLabel,
+        mode: "view",
+        saving: false,
+    };
+
+    renderTableRowView(dialog);
+
+    dialog.modal.show();
+}
+
 function createTableRowEditor(config) {
     const state = {
         table: null,
@@ -193,6 +664,13 @@ function createTableRowEditor(config) {
     };
 
     const editableFields = config.editableFields || [];
+    const modalEditableFields = Array.from(new Set(
+        editableFields.concat(
+            (config.viewFields || [])
+                .map(fieldConfig => fieldConfig.editField)
+                .filter(Boolean),
+        ),
+    ));
     const initialEditField = config.initialEditField || editableFields[0] || null;
 
     function notifyStateChange() {
@@ -239,6 +717,14 @@ function createTableRowEditor(config) {
         return value === "" ? null : value;
     }
 
+    function prepareModalRowData(rowData) {
+        if (typeof config.prepareModalRowData === "function") {
+            return config.prepareModalRowData(cloneRowData(rowData));
+        }
+
+        return cloneRowData(rowData);
+    }
+
     function getRowById(rowId) {
         if (!state.table) {
             return null;
@@ -262,6 +748,89 @@ function createTableRowEditor(config) {
         if (state.table) {
             state.table.redraw(true);
         }
+    }
+
+    function getFieldDefinition(fieldKey) {
+        if (!state.table || !fieldKey) {
+            return null;
+        }
+
+        try {
+            return state.table.getColumn(fieldKey)?.getDefinition() || null;
+        } catch (err) {
+            console.warn("Field definition lookup failed:", err);
+            return null;
+        }
+    }
+
+    function buildPayloadFromData(originalRow, currentRow) {
+        const payload = {};
+
+        editableFields.forEach(field => {
+            const originalValue = normalizeFieldValue(field, originalRow[field] ?? null, originalRow);
+            const currentValue = normalizeFieldValue(field, currentRow[field] ?? null, currentRow);
+
+            if (String(originalValue ?? "") !== String(currentValue ?? "")) {
+                payload[field] = currentValue;
+            }
+        });
+
+        return payload;
+    }
+
+    function showRowView(row) {
+        if (!Array.isArray(config.viewFields) || !config.viewFields.length) {
+            return;
+        }
+
+        showTableRowView({
+            title: typeof config.getViewTitle === "function"
+                ? config.getViewTitle(row.getData())
+                : (config.viewTitle || "Record Details"),
+            subtitle: typeof config.getViewSubtitle === "function"
+                ? config.getViewSubtitle(row.getData())
+                : (config.viewSubtitle || ""),
+            rowData: row.getData(),
+            fields: config.viewFields,
+            onDelete: config.deleteUrlBase
+                ? () => deleteRow(row)
+                : null,
+            editLabel: "Edit Row",
+            deleteLabel: "Delete Row",
+            editConfig: modalEditableFields.length
+                ? {
+                    editableFields: modalEditableFields,
+                    getFieldDefinition,
+                    prepareRowData: prepareModalRowData,
+                    isFieldEditable: (fieldKey, rowData) => {
+                        if (typeof config.isModalFieldEditable === "function") {
+                            return config.isModalFieldEditable({ field: fieldKey, rowData }) !== false;
+                        }
+
+                        return true;
+                    },
+                    onStartEdit: () => {
+                        if (state.mode) {
+                            alert(config.pendingModalEditMessage || "Save or cancel the current edits before editing from the modal.");
+                            return false;
+                        }
+
+                        return true;
+                    },
+                    onSave: async ({ originalData, draftData }) => {
+                        const preparedOriginal = prepareModalRowData(originalData);
+                        const preparedDraft = prepareModalRowData(draftData);
+                        const payload = buildPayloadFromData(preparedOriginal, preparedDraft);
+
+                        if (!Object.keys(payload).length) {
+                            return cloneRowData(row.getData());
+                        }
+
+                        return persistRowChanges(row, payload);
+                    },
+                }
+                : null,
+        });
     }
 
     function reset() {
@@ -315,23 +884,13 @@ function createTableRowEditor(config) {
 
     function buildPayload(row) {
         const rowData = row.getData();
-        const payload = {};
         const originalRow = getOriginalRowData(rowData[config.primaryKey]);
 
         if (!originalRow) {
-            return payload;
+            return {};
         }
 
-        editableFields.forEach(field => {
-            const originalValue = normalizeFieldValue(field, originalRow[field] ?? null, originalRow);
-            const currentValue = normalizeFieldValue(field, rowData[field] ?? null, rowData);
-
-            if (String(originalValue ?? "") !== String(currentValue ?? "")) {
-                payload[field] = currentValue;
-            }
-        });
-
-        return payload;
+        return buildPayloadFromData(originalRow, rowData);
     }
 
     function hasPendingChanges(row) {
@@ -439,32 +998,8 @@ function createTableRowEditor(config) {
             return;
         }
 
-        const rowId = row.getData()[config.primaryKey];
-
         try {
-            const response = await fetch(`${config.patchUrlBase}${rowId}/`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": csrftoken,
-                },
-                body: JSON.stringify(payload),
-            });
-
-            if (!response.ok) {
-                const message = typeof readApiError === "function"
-                    ? await readApiError(response, config.saveErrorMessage || "Failed to save changes")
-                    : (config.saveErrorMessage || "Failed to save changes");
-                throw new Error(message);
-            }
-
-            const updated = await response.json();
-            await Promise.resolve(row.update(updated));
-
-            if (typeof config.onSaveSuccess === "function") {
-                config.onSaveSuccess({ row, updated });
-            }
-
+            await persistRowChanges(row, payload);
             reset();
         } catch (err) {
             alert(err.message);
@@ -485,6 +1020,34 @@ function createTableRowEditor(config) {
 
         await Promise.all(restoreJobs);
         reset();
+    }
+
+    async function persistRowChanges(row, payload) {
+        const rowId = row.getData()[config.primaryKey];
+        const response = await fetch(`${config.patchUrlBase}${rowId}/`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrftoken,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const message = typeof readApiError === "function"
+                ? await readApiError(response, config.saveErrorMessage || "Failed to save changes")
+                : (config.saveErrorMessage || "Failed to save changes");
+            throw new Error(message);
+        }
+
+        const updated = await response.json();
+        await Promise.resolve(row.update(updated));
+
+        if (typeof config.onSaveSuccess === "function") {
+            config.onSaveSuccess({ row, updated });
+        }
+
+        return cloneRowData(row.getData());
     }
 
     async function saveAllEdits() {
@@ -570,7 +1133,14 @@ function createTableRowEditor(config) {
             return;
         }
 
-        const confirmed = options.skipConfirm || confirm(config.deleteConfirmMessage || "Delete this row?");
+        const confirmed = options.skipConfirm || await showSystemConfirm(
+            config.deleteConfirmMessage || "Delete this row?",
+            {
+                title: "Delete Record?",
+                confirmLabel: "Delete",
+                tone: "danger",
+            }
+        );
         if (!confirmed) {
             return;
         }
@@ -620,10 +1190,15 @@ function createTableRowEditor(config) {
             return;
         }
 
-        const confirmed = confirm(
+        const confirmed = await showSystemConfirm(
             options.confirmMessage
                 || config.bulkDeleteConfirmMessage
-                || `Delete ${rows.length} selected row${rows.length === 1 ? "" : "s"}?`
+                || `Delete ${rows.length} selected row${rows.length === 1 ? "" : "s"}?`,
+            {
+                title: "Delete Selected Records?",
+                confirmLabel: "Delete",
+                tone: "danger",
+            }
         );
 
         if (!confirmed) {
@@ -659,17 +1234,31 @@ function createTableRowEditor(config) {
     }
 
     function buildActionsColumn(options = {}) {
+        const hasView = Array.isArray(config.viewFields) && config.viewFields.length > 0;
+        const iconButton = (className, variant, icon, label) => `
+            <button
+                class="btn btn-sm ${variant} hcm-table-action-btn ${className}"
+                type="button"
+                title="${label}"
+                aria-label="${label}"
+            >
+                <i class="${icon}" aria-hidden="true"></i>
+                <span class="visually-hidden">${label}</span>
+            </button>
+        `;
+
         return {
             title: options.title || "Actions",
             headerSort: false,
-            width: options.width || (config.deleteUrlBase ? 250 : 170),
+            width: options.width || (config.deleteUrlBase ? (hasView ? 190 : 150) : (hasView ? 150 : 110)),
             hozAlign: "center",
             formatter: cell => {
                 if (state.mode === "all") {
                     return `
-                        <div class="d-flex gap-1 justify-content-center">
+                        <div class="d-flex gap-1 justify-content-center align-items-center hcm-table-actions">
+                            ${hasView ? iconButton("hcm-row-view", "btn-outline-secondary", "ti ti-eye", "View") : ""}
                             <span class="badge text-bg-light align-self-center">Editing</span>
-                            ${config.deleteUrlBase ? '<button class="btn btn-sm btn-danger hcm-row-delete">Delete</button>' : ""}
+                            ${config.deleteUrlBase ? iconButton("hcm-row-delete", "btn-danger", "ti ti-trash", "Delete") : ""}
                         </div>
                     `;
                 }
@@ -677,12 +1266,13 @@ function createTableRowEditor(config) {
                 const editing = isEditingRow(cell.getRow().getData());
 
                 return `
-                    <div class="d-flex gap-1 justify-content-center">
-                        <button class="btn btn-sm ${editing ? "btn-success hcm-row-save" : "btn-primary hcm-row-edit"}">
-                            ${editing ? "Save" : "Edit"}
-                        </button>
-                        ${editing ? '<button class="btn btn-sm btn-secondary hcm-row-cancel">Cancel</button>' : ""}
-                        ${config.deleteUrlBase ? '<button class="btn btn-sm btn-danger hcm-row-delete">Delete</button>' : ""}
+                    <div class="d-flex gap-1 justify-content-center align-items-center hcm-table-actions">
+                        ${hasView ? iconButton("hcm-row-view", "btn-outline-secondary", "ti ti-eye", "View") : ""}
+                        ${editing
+                            ? iconButton("hcm-row-save", "btn-success", "ti ti-device-floppy", "Save")
+                            : iconButton("hcm-row-edit", "btn-primary", "ti ti-pencil", "Edit")}
+                        ${editing ? iconButton("hcm-row-cancel", "btn-secondary", "ti ti-x", "Cancel") : ""}
+                        ${config.deleteUrlBase ? iconButton("hcm-row-delete", "btn-danger", "ti ti-trash", "Delete") : ""}
                     </div>
                 `;
             },
@@ -693,6 +1283,11 @@ function createTableRowEditor(config) {
                 }
 
                 const row = cell.getRow();
+
+                if (button.classList.contains("hcm-row-view")) {
+                    showRowView(row);
+                    return;
+                }
 
                 if (button.classList.contains("hcm-row-edit")) {
                     enterEditMode(row);
@@ -733,6 +1328,7 @@ function createTableRowEditor(config) {
         buildActionsColumn,
         deleteSelectedRows,
         deleteRow,
+        showRowView,
     };
 }
 

@@ -1,6 +1,17 @@
 from django.contrib import admin
 
-from .models import CSCPlantilla, Division, Position, SalaryGrade, TimeRule
+from .models import (
+    CSCPlantilla,
+    Division,
+    EmployeeLeaveCredit,
+    EmployeeLeaveCreditLedger,
+    LeaveApplication,
+    LeaveType,
+    LeaveTypeRule,
+    Position,
+    SalaryGrade,
+    TimeRule,
+)
 
 # Register your models here.
 @admin.register(Division)
@@ -10,7 +21,7 @@ class DivisionAdmin(admin.ModelAdmin):
     
 @admin.register(Position)
 class PositionAdmin(admin.ModelAdmin):
-    list_display = ('position_id', 'position_name', 'description')
+    list_display = ('position_id', 'position_name', 'standard_salary_grade', 'description')
     search_fields = ('position_name',)
     
 @admin.register(TimeRule)
@@ -34,5 +45,86 @@ class CSCPlantillaAdmin(admin.ModelAdmin):
         'division',
         'salary_grade',
         'salary_step',
+        'availability_status',
     )
     search_fields = ('item_number', 'position__position_name', 'division__division_name')
+
+
+class LeaveTypeRuleInline(admin.StackedInline):
+    model = LeaveTypeRule
+    extra = 0
+    can_delete = False
+
+
+@admin.register(LeaveType)
+class LeaveTypeAdmin(admin.ModelAdmin):
+    list_display = (
+        "leave_type_id",
+        "leave_code",
+        "leave_name",
+        "category",
+        "is_active",
+        "sort_order",
+    )
+    list_filter = ("category", "is_active", "is_system_seed")
+    search_fields = ("leave_code", "leave_name", "legal_basis")
+    inlines = (LeaveTypeRuleInline,)
+
+
+class EmployeeLeaveCreditLedgerInline(admin.TabularInline):
+    model = EmployeeLeaveCreditLedger
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        "entry_type",
+        "units_delta",
+        "balance_after",
+        "effective_date",
+        "reference_type",
+        "reference_id",
+        "notes",
+        "created",
+    )
+
+
+@admin.register(EmployeeLeaveCredit)
+class EmployeeLeaveCreditAdmin(admin.ModelAdmin):
+    list_display = (
+        "leave_credit_id",
+        "employee",
+        "bucket_code",
+        "bucket_name",
+        "current_balance",
+        "linked_leave_type",
+    )
+    list_filter = ("bucket_code",)
+    search_fields = (
+        "employee__employee_id",
+        "employee__first_name",
+        "employee__last_name",
+        "bucket_code",
+        "bucket_name",
+    )
+    inlines = (EmployeeLeaveCreditLedgerInline,)
+
+
+@admin.register(LeaveApplication)
+class LeaveApplicationAdmin(admin.ModelAdmin):
+    list_display = (
+        "leave_application_id",
+        "employee",
+        "leave_type",
+        "start_date",
+        "end_date",
+        "requested_units",
+        "status",
+        "balance_bucket_code",
+    )
+    list_filter = ("status", "leave_type__category")
+    search_fields = (
+        "employee__employee_id",
+        "employee__first_name",
+        "employee__last_name",
+        "leave_type__leave_name",
+        "leave_type__leave_code",
+    )

@@ -6,6 +6,10 @@ from .views import (
     DivisionViewSet,
     EmployeeViewSet,
     EmployeePersonalDataSheetViewSet,
+    EmployeeLeaveCreditLedgerViewSet,
+    EmployeeLeaveCreditViewSet,
+    LeaveApplicationViewSet,
+    LeaveTypeViewSet,
     PositionViewSet,
     SalaryGradeViewSet,
     TimeRuleViewSet,
@@ -21,6 +25,10 @@ router.register(r'positions', PositionViewSet)
 router.register(r'time_rules', TimeRuleViewSet)
 router.register(r'salary_grades', SalaryGradeViewSet)
 router.register(r'csc-plantilla', CSCPlantillaViewSet)
+router.register(r'leave-types', LeaveTypeViewSet)
+router.register(r'leave-credits', EmployeeLeaveCreditViewSet)
+router.register(r'leave-credit-ledger', EmployeeLeaveCreditLedgerViewSet)
+router.register(r'leave-applications', LeaveApplicationViewSet)
 router.register(r'approvers', ApproverViewSet)
 
 urlpatterns = [

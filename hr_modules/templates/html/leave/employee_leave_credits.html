@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block page_title %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="{% url 'leave_management' %}" class="text-decoration-none text-primary">
+                    <i class="bi bi-arrow-left-short"></i> Leave Management
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Employee Leave Credits</li>
+        </ol>
+    </nav>
+{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h5 class="card-title mb-1">Employee Leave Credits</h5>
+                    <p class="text-muted mb-0">Maintain employee leave balances by CSC bucket or tracked leave type.</p>
+                </div>
+                <div class="d-flex gap-2 align-items-center flex-nowrap">
+                    <input type="text" class="table-search form-control" id="table-search" placeholder="Search...">
+                    <button id="edit-all-leave-credits-btn" type="button" class="btn btn-outline-primary btn-md text-nowrap">
+                        <i class="ti ti-edit"></i> Edit All Rows
+                    </button>
+                    <button id="save-all-leave-credits-btn" type="button" class="btn btn-success btn-md text-nowrap d-none">
+                        <i class="ti ti-device-floppy"></i> Save All
+                    </button>
+                    <button id="cancel-all-leave-credits-btn" type="button" class="btn btn-secondary btn-md text-nowrap d-none">
+                        <i class="ti ti-x"></i> Cancel All
+                    </button>
+                    <button id="delete-selected-leave-credits-btn" type="button" class="btn btn-danger btn-md d-none">
+                        <i class="ti ti-trash"></i> Delete Selected
+                    </button>
+                    <button id="add-leave-credit-btn" type="button" class="btn btn-primary btn-md">
+                        <i class="ti ti-plus"></i> Add Leave Credit
+                    </button>
+                </div>
+            </div>
+            <div id="leave-credits-table"></div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addLeaveCreditModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Employee Leave Credit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="add-leave-credit-form">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="add-credit-employee">Employee</label>
+                                <select id="add-credit-employee" class="form-select" required></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="add-credit-bucket">Balance Bucket</label>
+                                <select id="add-credit-bucket" class="form-select" required></select>
+                                <div class="form-text">Includes standard vacation/sick buckets and tracked leave-type balances.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="add-credit-balance">Current Balance</label>
+                                <input id="add-credit-balance" type="number" min="0" step="0.01" class="form-control" required>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label" for="add-credit-notes">Notes</label>
+                                <textarea id="add-credit-notes" class="form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {% load static %}
+    <script src="{% static 'js/hr/leave/employee_leave_credits.js' %}"></script>
+{% endblock %}
