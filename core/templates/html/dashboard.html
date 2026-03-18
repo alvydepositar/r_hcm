@@ -4,7 +4,7 @@
 
 {% block content %}
 <!-- HR Dashboard-->
-<div id="hr-dashboard" > 
+<div id="hr-dashboard" {% if portal_mode == 'employee' %}style="display: none;"{% endif %}> 
     <div class="row">
         <div class="col-4">
             <div class="card overflow-hidden">
@@ -179,7 +179,7 @@
     </div>
 </div>
 
-<div id="employee-dashboard" style="display: none;">
+<div id="employee-dashboard" {% if portal_mode != 'employee' %}style="display: none;"{% endif %}>
     <div class="row">
         <div class="col-4">
             <div class="card">

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block page_title %}
+    Leave History
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/employee-leave-portal.css' %}" />
+{% endblock %}
+
+{% block content %}
+    <div class="employee-leave-portal" id="employee-leave-history-page">
+        <div class="card employee-leave-portal__history-card">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                    <div>
+                        <h5 class="card-title mb-1">Leave History</h5>
+                        <p class="text-muted mb-0">
+                            Filed leave requests, current status, approval progress, and cancellation controls.
+                        </p>
+                    </div>
+                    <div class="d-flex gap-2 align-items-end flex-wrap">
+                        <div>
+                            <label class="form-label mb-1" for="employee-history-filter">Status</label>
+                            <select id="employee-history-filter" class="form-select">
+                                <option value="">All statuses</option>
+                                <option value="submitted">Submitted</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label mb-1" for="employee-history-search">Search</label>
+                            <input id="employee-history-search" type="search" class="table-search form-control" placeholder="Leave type or reason">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 employee-leave-portal__history-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Leave Type</th>
+                                <th scope="col">Date Range</th>
+                                <th scope="col" class="text-end">Units</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Rule Summary</th>
+                                <th scope="col">Reason</th>
+                                <th scope="col" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="employee-history-body">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">Loading leave history.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="employeeLeaveHistoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Leave Filing Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="small text-uppercase text-muted fw-semibold">Leave Type</div>
+                            <div id="history-modal-leave-type" class="fw-semibold">-</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-uppercase text-muted fw-semibold">Status</div>
+                            <div id="history-modal-status" class="fw-semibold">-</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-uppercase text-muted fw-semibold">Date Range</div>
+                            <div id="history-modal-date-range">-</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-uppercase text-muted fw-semibold">Requested Units</div>
+                            <div id="history-modal-requested-units">-</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-uppercase text-muted fw-semibold">Current Step</div>
+                            <div id="history-modal-approval-step">-</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="small text-uppercase text-muted fw-semibold">Rule Summary</div>
+                            <div id="history-modal-rule-summary" class="border rounded p-3 bg-light-subtle">-</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="small text-uppercase text-muted fw-semibold">Reason</div>
+                            <div id="history-modal-reason" class="border rounded p-3 bg-light-subtle">-</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="small text-uppercase text-muted fw-semibold">Supporting Document</div>
+                            <div id="history-modal-document" class="border rounded p-3 bg-light-subtle">-</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="small text-uppercase text-muted fw-semibold">Filed Details</div>
+                            <div id="history-modal-application-details" class="border rounded p-3 bg-light-subtle">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{% static 'js/employee/leave_history.js' %}"></script>
+{% endblock %}

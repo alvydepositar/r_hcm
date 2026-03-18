@@ -1,9 +1,17 @@
+from django.conf import settings
 from django.db import models
 from core.models import Division, Position
 
 # Create your models here.
 class Employee(models.Model):
     id = models.AutoField(primary_key=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employee_profile",
+    )
     employee_id = models.CharField(max_length=20, unique=True)
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)

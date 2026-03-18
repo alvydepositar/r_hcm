@@ -23,7 +23,7 @@
       <!-- Sidebar scroll-->
       <div>
         <div class="brand-logo d-flex align-items-center justify-content-between">
-          <a href="./index.html" class="text-nowrap logo-img pt-3">
+          <a href="{% if portal_mode == 'employee' %}{% url 'index' %}?portal=employee{% else %}{% url 'index' %}{% endif %}" class="text-nowrap logo-img pt-3">
             <img src="{% static 'images/logos/logo.png' %}" alt="" />
           </a>
           <div class="close-btn d-xl-none d-block sidebartoggler cursor-pointer" id="sidebarCollapse">
@@ -38,7 +38,7 @@
               <span class="hide-menu">Home</span>
             </li>
             <li class="sidebar-item">
-              <a class="sidebar-link" href="{% url 'index' %}" aria-expanded="false">
+              <a class="sidebar-link" href="{% if portal_mode == 'employee' %}{% url 'index' %}?portal=employee{% else %}{% url 'index' %}{% endif %}" aria-expanded="false" id="sidebar-dashboard-link">
                 <i class="ti ti-atom"></i>
                 <span class="hide-menu">Dashboard</span>
               </a>
@@ -52,7 +52,8 @@
             </li>
 
             <!-- HR/Admin Navigation-->
-            <div id="hr-admin-nav">
+            {% if can_access_hr_portal %}
+            <div id="hr-admin-nav" {% if portal_mode == 'employee' %}style="display: none;"{% endif %}>
               <li class="nav-small-cap">
                 <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
                 <span class="hide-menu">Management</span>
@@ -86,9 +87,11 @@
                 </a>
               </li>
             </div>
+            {% endif %}
 
             <!-- Employee/Approver Navigation-->
-            <div id="employee-nav" style="display: none;">
+            {% if can_access_employee_portal %}
+            <div id="employee-nav" {% if portal_mode != 'employee' %}style="display: none;"{% endif %}>
               <li class="nav-small-cap">
                 <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
                 <span class="hide-menu">Filings</span>
@@ -105,8 +108,8 @@
                 </a>
                 <ul aria-expanded="false" class="collapse first-level">
                   <li class="sidebar-item">
-                    <a class="sidebar-link justify-content-between" target="_blank"
-                      href="#">
+                    <a class="sidebar-link justify-content-between"
+                      href="{% url 'employee_leave_portal' %}?portal=employee">
                       <div class="d-flex align-items-center gap-3">
                         <div class="round-16 d-flex align-items-center justify-content-center">
                           <i class="ti ti-circle"></i>
@@ -115,9 +118,10 @@
                       </div>
                     </a>
                   </li>
+                  {% if can_access_approval_queue %}
                   <li class="sidebar-item">
-                    <a class="sidebar-link justify-content-between" target="_blank"
-                      href="#">
+                    <a class="sidebar-link justify-content-between"
+                      href="{% url 'employee_leave_approval_queue' %}?portal=employee">
                       <div class="d-flex align-items-center gap-3">
                         <div class="round-16 d-flex align-items-center justify-content-center">
                           <i class="ti ti-circle"></i>
@@ -126,9 +130,10 @@
                       </div>
                     </a>
                   </li>
+                  {% endif %}
                   <li class="sidebar-item">
-                    <a class="sidebar-link justify-content-between" target="_blank"
-                      href="#">
+                    <a class="sidebar-link justify-content-between"
+                      href="{% url 'employee_leave_history' %}?portal=employee">
                       <div class="d-flex align-items-center gap-3">
                         <div class="round-16 d-flex align-items-center justify-content-center">
                           <i class="ti ti-circle"></i>
@@ -250,6 +255,7 @@
                 </a>
               </li>
             </div>
+            {% endif %}
             
           </ul>
         </nav>
@@ -288,15 +294,17 @@
           </ul>
           <div class="navbar-collapse justify-content-end px-0" id="navbarNav">
             <ul class="navbar-nav flex-row ms-auto align-items-center justify-content-end">
+              {% if can_access_hr_portal and can_access_employee_portal %}
               <li class="nav-item me-2">
                 <a
                   class="btn btn-outline-primary btn-sm text-nowrap"
                   id="switch-employee-portal-btn"
-                  href="{% url 'index' %}?portal=employee"
+                  href="{% if portal_mode == 'employee' %}{% url 'index' %}?portal=hr{% else %}{% url 'index' %}?portal=employee{% endif %}"
                 >
-                  Switch to Employee Portal
+                  {% if portal_mode == 'employee' %}Switch to HR Portal{% else %}Switch to Employee Portal{% endif %}
                 </a>
               </li>
+              {% endif %}
               <li class="nav-item dropdown">
                 <a class="nav-link " href="javascript:void(0)" id="drop2" data-bs-toggle="dropdown"
                   aria-expanded="false">
@@ -304,6 +312,12 @@
                 </a>
                 <div class="dropdown-menu dropdown-menu-end dropdown-menu-animate-up" aria-labelledby="drop2">
                   <div class="message-body">
+                    <div class="px-3 py-2 border-bottom">
+                      <div class="fw-semibold">{{ user.username }}</div>
+                      {% if current_employee %}
+                        <div class="small text-muted">{{ current_employee.first_name }} {{ current_employee.last_name }}</div>
+                      {% endif %}
+                    </div>
                     <a href="javascript:void(0)" class="d-flex align-items-center gap-2 dropdown-item">
                       <i class="ti ti-user fs-6"></i>
                       <p class="mb-0 fs-3">My Profile</p>
@@ -316,7 +330,10 @@
                       <i class="ti ti-list-check fs-6"></i>
                       <p class="mb-0 fs-3">My Task</p>
                     </a>
-                    <a href="./authentication-login.html" class="btn btn-outline-primary mx-3 mt-2 d-block">Logout</a>
+                    <form method="post" action="{% url 'logout' %}" class="mx-3 mt-2">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-outline-primary w-100">Logout</button>
+                    </form>
                   </div>
                 </div>
               </li>
@@ -344,30 +361,13 @@
   <script src="{% static 'js/helpers.js' %}"></script>
   <script src="{% static 'js/sidebarmenu.js' %}"></script>
   <script src="{% static 'js/app.min.js' %}"></script>
+  {{ portal_context_data|json_script:"hcm-portal-context" }}
   <script>
     (() => {
-      const portalMode = new URLSearchParams(window.location.search).get("portal");
-      const isEmployeePortal = portalMode === "employee";
-
-      const hrAdminNav = document.getElementById("hr-admin-nav");
-      const employeeNav = document.getElementById("employee-nav");
-      const hrDashboard = document.getElementById("hr-dashboard");
-      const employeeDashboard = document.getElementById("employee-dashboard");
-      const switchEmployeePortalButton = document.getElementById("switch-employee-portal-btn");
-
-      if (hrAdminNav && employeeNav) {
-        hrAdminNav.style.display = isEmployeePortal ? "none" : "";
-        employeeNav.style.display = isEmployeePortal ? "" : "none";
-      }
-
-      if (hrDashboard && employeeDashboard) {
-        hrDashboard.style.display = isEmployeePortal ? "none" : "";
-        employeeDashboard.style.display = isEmployeePortal ? "" : "none";
-      }
-
-      if (switchEmployeePortalButton) {
-        switchEmployeePortalButton.classList.toggle("d-none", isEmployeePortal);
-      }
+      const portalContextElement = document.getElementById("hcm-portal-context");
+      window.HCM_PORTAL_CONTEXT = portalContextElement
+        ? JSON.parse(portalContextElement.textContent)
+        : {};
     })();
   </script>
   

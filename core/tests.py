@@ -1,11 +1,13 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib.auth import authenticate, get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from employee_modules.models import Employee
+from hr_modules.models import Approver
 
 from core.models import (
     CSCPlantilla,
@@ -13,13 +15,20 @@ from core.models import (
     EmployeeLeaveCredit,
     EmployeeLeaveCreditLedger,
     LeaveApplication,
+    LeaveApplicationApproval,
     LeaveType,
     Position,
     SalaryGrade,
 )
 
 
-class SalaryGradeTests(TestCase):
+class HRPortalAuthMixin:
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(get_user_model().objects.get(username="amelia.rivera"))
+
+
+class SalaryGradeTests(HRPortalAuthMixin, TestCase):
     def test_salary_grade_string_representation(self):
         salary_grade = SalaryGrade.objects.get(csc_grade=11)
 
@@ -82,7 +91,7 @@ class SalaryGradeTests(TestCase):
         self.assertFalse(SalaryGrade.objects.filter(pk=salary_grade_id).exists())
 
 
-class CSCPlantillaTests(TestCase):
+class CSCPlantillaTests(HRPortalAuthMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.salary_grade_11 = SalaryGrade.objects.get(csc_grade=11)
@@ -213,16 +222,27 @@ class CSCPlantillaTests(TestCase):
         self.assertIn("salary_grade", response.json())
 
 
-class LeaveTypeTests(TestCase):
+class LeaveTypeTests(HRPortalAuthMixin, TestCase):
     def test_leave_type_seed_data_is_loaded(self):
+        vacation_leave = LeaveType.objects.get(leave_code="VL")
         wellness_leave = LeaveType.objects.get(leave_code="WELL")
         maternity_leave = LeaveType.objects.get(leave_code="ML")
+        paternity_leave = LeaveType.objects.get(leave_code="PAT")
+        leave_without_pay = LeaveType.objects.get(leave_code="LWOP")
 
-        self.assertEqual(LeaveType.objects.count(), 16)
+        self.assertEqual(LeaveType.objects.count(), 17)
+        self.assertEqual(vacation_leave.rule.filing_detail_template, "travel")
+        self.assertEqual(vacation_leave.rule.application_detail_schema[0]["key"], "travel_scope")
+        self.assertEqual(vacation_leave.rule.application_detail_schema[0]["choices"][1]["value"], "abroad")
+        self.assertEqual(paternity_leave.rule.filing_detail_template, "paternity")
+        self.assertEqual(paternity_leave.rule.application_detail_schema[0]["key"], "paternity_spouse_name")
         self.assertEqual(wellness_leave.category, LeaveType.Category.WELLNESS)
         self.assertEqual(str(wellness_leave.rule.entitlement_value), "5.00")
         self.assertEqual(wellness_leave.rule.entitlement_period, "per_year")
         self.assertEqual(maternity_leave.rule.entitlement_summary(), "105 Calendar Days / Per Occurrence (max 105 consecutive days)")
+        self.assertEqual(leave_without_pay.rule.pay_status, "without_pay")
+        self.assertEqual(leave_without_pay.rule.balance_tracking_mode, "none")
+        self.assertFalse(leave_without_pay.rule.requires_earned_leave_credits)
 
     def test_leave_type_page_renders(self):
         response = self.client.get(reverse("leave_types"))
@@ -230,7 +250,7 @@ class LeaveTypeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CSC Leave Types and Rules")
         self.assertContains(response, "Add Leave Type")
-        self.assertContains(response, "Entitlement Value")
+        self.assertContains(response, "Leave-Specific Filing Rule")
 
     def test_leave_type_api_crud(self):
         create_response = self.client.post(
@@ -257,6 +277,8 @@ class LeaveTypeTests(TestCase):
                 "supporting_document_notes": "Supervisor endorsement required.",
                 "eligibility_notes": "For permanent staff only.",
                 "filing_notes": "File at least three days ahead.",
+                "filing_detail_template": "travel",
+                "travel_abroad_notice_days": 10,
                 "rule_notes": "Agency-specific test record.",
             },
             content_type="application/json",
@@ -265,6 +287,9 @@ class LeaveTypeTests(TestCase):
         self.assertEqual(create_response.status_code, 201)
         created = create_response.json()
         self.assertEqual(created["leave_code"], "CAREER")
+        self.assertEqual(created["filing_detail_template"], "travel")
+        self.assertEqual(created["travel_abroad_notice_days"], 10)
+        self.assertEqual(created["application_detail_schema"][0]["key"], "travel_scope")
         self.assertEqual(created["entitlement_summary"], "2 Working Days / Per Year (max 2 consecutive days)")
 
         leave_type_id = created["leave_type_id"]
@@ -274,12 +299,14 @@ class LeaveTypeTests(TestCase):
             data={
                 "entitlement_value": "4.00",
                 "max_consecutive_days": "3.00",
+                "travel_abroad_notice_days": 15,
                 "rule_notes": "Updated rule note.",
             },
             content_type="application/json",
         )
         self.assertEqual(patch_response.status_code, 200)
         self.assertEqual(patch_response.json()["entitlement_summary"], "4 Working Days / Per Year (max 3 consecutive days)")
+        self.assertEqual(patch_response.json()["travel_abroad_notice_days"], 15)
 
         delete_response = self.client.delete(f"/api/leave-types/{leave_type_id}/")
         self.assertEqual(delete_response.status_code, 204)
@@ -326,8 +353,72 @@ class LeaveTypeTests(TestCase):
             "leave_type",
         )
 
+    def test_leave_type_accepts_structured_application_detail_schema(self):
+        response = self.client.post(
+            "/api/leave-types/",
+            data={
+                "leave_code": "TESTDET",
+                "leave_name": "Test Detail Leave",
+                "category": "special",
+                "pay_status": "with_pay",
+                "credit_deduction_mode": "none",
+                "entitlement_value": "1.00",
+                "entitlement_unit": "working_days",
+                "entitlement_period": "per_application",
+                "requires_earned_leave_credits": False,
+                "application_detail_schema": [
+                    {
+                        "key": "event_scope",
+                        "label": "Event Scope",
+                        "type": "select",
+                        "required": True,
+                        "choices": [
+                            {"value": "local", "label": "Local"},
+                            {"value": "external", "label": "External"},
+                        ],
+                    }
+                ],
+            },
+            content_type="application/json",
+        )
 
-class EmployeeLeaveCreditTests(TestCase):
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            response.json()["application_detail_schema"][0]["key"],
+            "event_scope",
+        )
+        self.assertEqual(response.json()["filing_detail_template"], "custom")
+
+    def test_leave_type_rejects_invalid_application_detail_schema(self):
+        response = self.client.post(
+            "/api/leave-types/",
+            data={
+                "leave_code": "BADSCHEMA",
+                "leave_name": "Bad Schema Leave",
+                "category": "special",
+                "pay_status": "with_pay",
+                "credit_deduction_mode": "none",
+                "entitlement_value": "1.00",
+                "entitlement_unit": "working_days",
+                "entitlement_period": "per_application",
+                "requires_earned_leave_credits": False,
+                "application_detail_schema": [
+                    {
+                        "key": "bad_select",
+                        "label": "Bad Select",
+                        "type": "select",
+                        "required": True,
+                    }
+                ],
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("application_detail_schema", response.json())
+
+
+class EmployeeLeaveCreditTests(HRPortalAuthMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.division = Division.objects.create(
@@ -384,7 +475,7 @@ class EmployeeLeaveCreditTests(TestCase):
         self.assertFalse(EmployeeLeaveCredit.objects.filter(pk=leave_credit_id).exists())
 
 
-class SeededLeaveApplicationTests(TestCase):
+class SeededLeaveApplicationTests(HRPortalAuthMixin, TestCase):
     def test_leave_application_seed_data_is_loaded(self):
         self.assertEqual(LeaveApplication.objects.count(), 5)
         self.assertEqual(
@@ -425,7 +516,7 @@ class SeededLeaveApplicationTests(TestCase):
         self.assertEqual(wellness_credit.current_balance, Decimal("3.00"))
 
 
-class LeaveApplicationTests(TestCase):
+class LeaveApplicationTests(HRPortalAuthMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.division = Division.objects.create(
@@ -444,6 +535,8 @@ class LeaveApplicationTests(TestCase):
         )
         cls.vacation_leave = LeaveType.objects.get(leave_code="VL")
         cls.sick_leave = LeaveType.objects.get(leave_code="SL")
+        cls.paternity_leave = LeaveType.objects.get(leave_code="PAT")
+        cls.study_leave = LeaveType.objects.get(leave_code="STL")
         cls.wellness_leave = LeaveType.objects.get(leave_code="WELL")
         cls.vacation_credit = EmployeeLeaveCredit.objects.create(
             employee=cls.employee,
@@ -479,6 +572,10 @@ class LeaveApplicationTests(TestCase):
                 "end_date": end_date.isoformat(),
                 "status": "approved",
                 "reason": "Family trip",
+                "application_details": {
+                    "travel_scope": "abroad",
+                    "travel_destination": "Tokyo, Japan",
+                },
             },
             content_type="application/json",
         )
@@ -526,9 +623,389 @@ class LeaveApplicationTests(TestCase):
                 "end_date": start_date.isoformat(),
                 "status": "submitted",
                 "reason": "Feeling unwell",
+                "application_details": {
+                    "medical_context": "out_patient",
+                    "illness_details": "Flu-like symptoms and medical consultation.",
+                },
             },
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("supporting_document_reference", response.json())
+
+    def test_vacation_leave_requires_travel_scope_and_destination(self):
+        start_date = timezone.localdate() + timedelta(days=10)
+        end_date = start_date + timedelta(days=1)
+
+        response = self.client.post(
+            "/api/leave-applications/",
+            data={
+                "employee": self.employee.pk,
+                "leave_type": self.vacation_leave.pk,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "status": "submitted",
+                "reason": "Family vacation",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("application_details", response.json())
+
+        valid_response = self.client.post(
+            "/api/leave-applications/",
+            data={
+                "employee": self.employee.pk,
+                "leave_type": self.vacation_leave.pk,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "status": "submitted",
+                "reason": "Family vacation",
+                "application_details": {
+                    "travel_scope": "within_philippines",
+                    "travel_destination": "Bohol",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(valid_response.status_code, 201)
+        self.assertIn("Travel Scope", valid_response.json()["application_detail_summary"])
+
+    def test_travel_abroad_notice_days_apply_only_to_abroad_requests(self):
+        vacation_leave = LeaveType.objects.get(pk=self.vacation_leave.pk)
+        vacation_leave.rule.travel_abroad_notice_days = 20
+        vacation_leave.rule.save(update_fields=["travel_abroad_notice_days"])
+
+        start_date = timezone.localdate() + timedelta(days=10)
+        end_date = start_date + timedelta(days=1)
+
+        abroad_response = self.client.post(
+            "/api/leave-applications/",
+            data={
+                "employee": self.employee.pk,
+                "leave_type": vacation_leave.pk,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "status": "submitted",
+                "reason": "Foreign travel",
+                "application_details": {
+                    "travel_scope": "abroad",
+                    "travel_destination": "Singapore",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(abroad_response.status_code, 400)
+        self.assertIn("start_date", abroad_response.json())
+
+        local_response = self.client.post(
+            "/api/leave-applications/",
+            data={
+                "employee": self.employee.pk,
+                "leave_type": vacation_leave.pk,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "status": "submitted",
+                "reason": "Domestic travel",
+                "application_details": {
+                    "travel_scope": "within_philippines",
+                    "travel_destination": "Bohol",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(local_response.status_code, 201)
+
+    def test_paternity_leave_requires_csc_specific_application_details(self):
+        start_date = timezone.localdate() + timedelta(days=3)
+
+        invalid_response = self.client.post(
+            "/api/leave-applications/",
+            data={
+                "employee": self.employee.pk,
+                "leave_type": self.paternity_leave.pk,
+                "start_date": start_date.isoformat(),
+                "end_date": (start_date + timedelta(days=6)).isoformat(),
+                "status": "submitted",
+                "reason": "Paternity leave",
+                "supporting_document_reference": "PAT-REQ-001",
+                "application_details": {
+                    "paternity_case_type": "childbirth",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(invalid_response.status_code, 400)
+        self.assertIn("application_details", invalid_response.json())
+
+        valid_response = self.client.post(
+            "/api/leave-applications/",
+            data={
+                "employee": self.employee.pk,
+                "leave_type": self.paternity_leave.pk,
+                "start_date": start_date.isoformat(),
+                "end_date": (start_date + timedelta(days=6)).isoformat(),
+                "status": "submitted",
+                "reason": "Paternity leave",
+                "supporting_document_reference": "PAT-REQ-001",
+                "application_details": {
+                    "paternity_spouse_name": "Ana Applicant",
+                    "paternity_case_type": "childbirth",
+                    "paternity_delivery_date": start_date.isoformat(),
+                    "paternity_delivery_order": "1",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(valid_response.status_code, 201)
+        self.assertIn("Name of Legitimate Spouse", valid_response.json()["application_detail_summary"])
+
+    def test_study_leave_other_purpose_requires_specific_detail(self):
+        start_date = timezone.localdate() + timedelta(days=20)
+
+        response = self.client.post(
+            "/api/leave-applications/",
+            data={
+                "employee": self.employee.pk,
+                "leave_type": self.study_leave.pk,
+                "start_date": start_date.isoformat(),
+                "end_date": start_date.isoformat(),
+                "requested_units": "6.00",
+                "status": "submitted",
+                "reason": "Graduate studies",
+                "supporting_document_reference": "STL-PLAN-001",
+                "application_details": {
+                    "study_leave_purpose": "other",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("application_details", response.json())
+
+        valid_response = self.client.post(
+            "/api/leave-applications/",
+            data={
+                "employee": self.employee.pk,
+                "leave_type": self.study_leave.pk,
+                "start_date": start_date.isoformat(),
+                "end_date": start_date.isoformat(),
+                "requested_units": "6.00",
+                "status": "submitted",
+                "reason": "Graduate studies",
+                "supporting_document_reference": "STL-PLAN-001",
+                "application_details": {
+                    "study_leave_purpose": "other",
+                    "study_leave_other_purpose": "Doctoral qualifying examination preparation",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(valid_response.status_code, 201)
+        self.assertIn(
+            "Doctoral qualifying examination preparation",
+            valid_response.json()["application_detail_summary"],
+        )
+
+
+class RBACAndApprovalWorkflowTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.division = Division.objects.create(
+            division_name="Approval Workflow Division",
+            division_abbreviation="AWD",
+        )
+        cls.position = Position.objects.create(position_name="Approval Workflow Position")
+        cls.requester = Employee.objects.create(
+            employee_id="EMP-RBAC-001",
+            first_name="Rica",
+            last_name="Requester",
+            position=cls.position,
+            division=cls.division,
+        )
+        cls.supervisor = Employee.objects.create(
+            employee_id="EMP-RBAC-002",
+            first_name="Simon",
+            last_name="Supervisor",
+            position=cls.position,
+            division=cls.division,
+        )
+        cls.division_chief = Employee.objects.create(
+            employee_id="EMP-RBAC-003",
+            first_name="Cathy",
+            last_name="Chief",
+            position=cls.position,
+            division=cls.division,
+        )
+        cls.hr_approver = Employee.objects.create(
+            employee_id="EMP-RBAC-004",
+            first_name="Hanna",
+            last_name="Approver",
+            position=cls.position,
+            division=cls.division,
+        )
+        cls.vacation_leave = LeaveType.objects.get(leave_code="VL")
+
+        EmployeeLeaveCredit.objects.create(
+            employee=cls.requester,
+            bucket_code="vacation",
+            bucket_name="Vacation Leave Credits",
+            current_balance=Decimal("15.00"),
+        )
+
+        Approver.objects.create(
+            approval_type=Approver.ApprovalType.DIVISION,
+            division_id=cls.division,
+            immediate_supervisor=cls.supervisor,
+            division_chief=cls.division_chief,
+            hr_approver=cls.hr_approver,
+        )
+
+        user_model = get_user_model()
+        cls.requester_user = user_model.objects.create_user(username="rbac.requester", password="Employee@2026")
+        cls.supervisor_user = user_model.objects.create_user(username="rbac.supervisor", password="Approver@2026")
+        cls.requester.user = cls.requester_user
+        cls.requester.save(update_fields=["user"])
+        cls.supervisor.user = cls.supervisor_user
+        cls.supervisor.save(update_fields=["user"])
+
+    def test_seeded_rbac_credentials_are_available(self):
+        self.assertIsNotNone(authenticate(username="amelia.rivera", password="HrPortal@2026"))
+        self.assertIsNotNone(authenticate(username="miguel.bautista", password="Approver@2026"))
+        self.assertIsNotNone(authenticate(username="leah.torres", password="Approver@2026"))
+
+    def test_employee_user_cannot_open_hr_page(self):
+        self.client.force_login(self.requester_user)
+
+        response = self.client.get(reverse("employee_management"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_dual_role_user_uses_employee_navigation_on_employee_routes(self):
+        dual_role_user = get_user_model().objects.get(username="amelia.rivera")
+        self.client.force_login(dual_role_user)
+
+        response = self.client.get(reverse("employee_leave_portal"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["portal_mode"], "employee")
+
+    def test_portal_switch_persists_for_dual_role_user_until_hr_route_is_opened(self):
+        dual_role_user = get_user_model().objects.get(username="amelia.rivera")
+        self.client.force_login(dual_role_user)
+
+        switch_response = self.client.get(f"{reverse('index')}?portal=employee")
+        self.assertEqual(switch_response.status_code, 200)
+        self.assertEqual(switch_response.context["portal_mode"], "employee")
+
+        persisted_response = self.client.get(reverse("index"))
+        self.assertEqual(persisted_response.status_code, 200)
+        self.assertEqual(persisted_response.context["portal_mode"], "employee")
+
+        hr_response = self.client.get(reverse("leave_management"))
+        self.assertEqual(hr_response.status_code, 200)
+        self.assertEqual(hr_response.context["portal_mode"], "hr")
+
+    def test_dual_role_user_can_switch_back_to_hr_mode_from_index(self):
+        dual_role_user = get_user_model().objects.get(username="amelia.rivera")
+        self.client.force_login(dual_role_user)
+
+        employee_response = self.client.get(f"{reverse('index')}?portal=employee")
+        self.assertEqual(employee_response.status_code, 200)
+        self.assertEqual(employee_response.context["portal_mode"], "employee")
+
+        hr_response = self.client.get(f"{reverse('index')}?portal=hr")
+        self.assertEqual(hr_response.status_code, 200)
+        self.assertEqual(hr_response.context["portal_mode"], "hr")
+
+    def test_submitted_leave_application_creates_pending_approval_queue(self):
+        self.client.force_login(self.requester_user)
+        start_date = timezone.localdate() + timedelta(days=7)
+        end_date = start_date + timedelta(days=1)
+
+        response = self.client.post(
+            "/api/leave-applications/",
+            data={
+                "employee": self.requester.pk,
+                "leave_type": self.vacation_leave.pk,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "status": "submitted",
+                "reason": "Workflow validation",
+                "application_details": {
+                    "travel_scope": "within_philippines",
+                    "travel_destination": "Cebu",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        application_id = response.json()["leave_application_id"]
+        approvals = LeaveApplicationApproval.objects.filter(
+            leave_application_id=application_id,
+        ).order_by("sequence")
+
+        self.assertEqual(approvals.count(), 3)
+        self.assertEqual(approvals[0].status, LeaveApplicationApproval.Status.PENDING)
+        self.assertEqual(approvals[0].approver_employee, self.supervisor)
+        self.assertEqual(approvals[1].status, LeaveApplicationApproval.Status.QUEUED)
+
+    def test_approver_can_approve_assigned_leave(self):
+        application = LeaveApplication.objects.create(
+            employee=self.requester,
+            leave_type=self.vacation_leave,
+            start_date=timezone.localdate() + timedelta(days=7),
+            end_date=timezone.localdate() + timedelta(days=8),
+            requested_units=Decimal("2.00"),
+            status=LeaveApplication.Status.SUBMITTED,
+            reason="For approval queue page",
+            balance_bucket_code="vacation",
+            deducted_units=Decimal("2.00"),
+            rule_snapshot={"leave_code": "VL"},
+        )
+        first_step = LeaveApplicationApproval.objects.create(
+            leave_application=application,
+            approver_employee=self.supervisor,
+            approver_role=LeaveApplicationApproval.ApprovalRole.IMMEDIATE_SUPERVISOR,
+            sequence=1,
+            status=LeaveApplicationApproval.Status.PENDING,
+        )
+        LeaveApplicationApproval.objects.create(
+            leave_application=application,
+            approver_employee=self.division_chief,
+            approver_role=LeaveApplicationApproval.ApprovalRole.DIVISION_CHIEF,
+            sequence=2,
+            status=LeaveApplicationApproval.Status.QUEUED,
+        )
+
+        self.client.force_login(self.supervisor_user)
+
+        queue_response = self.client.get("/api/leave-approvals/?status=pending")
+        self.assertEqual(queue_response.status_code, 200)
+        self.assertEqual(len(queue_response.json()), 1)
+
+        decision_response = self.client.patch(
+            f"/api/leave-approvals/{first_step.leave_application_approval_id}/",
+            data={"status": "approved", "decision_notes": "Approved by supervisor."},
+            content_type="application/json",
+        )
+
+        self.assertEqual(decision_response.status_code, 200)
+
+        first_step.refresh_from_db()
+        next_step = application.approvals.get(sequence=2)
+        application.refresh_from_db()
+
+        self.assertEqual(first_step.status, LeaveApplicationApproval.Status.APPROVED)
+        self.assertEqual(next_step.status, LeaveApplicationApproval.Status.PENDING)
+        self.assertEqual(application.status, LeaveApplication.Status.SUBMITTED)
