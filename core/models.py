@@ -4,6 +4,18 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from core.leave_policy import (
+    LEAVE_APPLICATION_DETAIL_TEMPLATE_CUSTOM,
+    LEAVE_APPLICATION_DETAIL_TEMPLATE_NONE,
+    LEAVE_APPLICATION_DETAIL_TEMPLATE_PATERNITY,
+    LEAVE_APPLICATION_DETAIL_TEMPLATE_SICK,
+    LEAVE_APPLICATION_DETAIL_TEMPLATE_STUDY,
+    LEAVE_APPLICATION_DETAIL_TEMPLATE_TRAVEL,
+    LEAVE_APPLICATION_DETAIL_TEMPLATE_WOMEN_SURGERY,
+    build_leave_application_detail_schema,
+    normalize_leave_application_detail_schema,
+)
+
 # Create your models here.
 class Division(models.Model):
     division_id = models.AutoField(primary_key=True)
@@ -217,6 +229,15 @@ class LeaveTypeRule(models.Model):
         ON_SEPARATION = "on_separation", "Upon Separation"
         NOT_FIXED = "not_fixed", "Not Fixed"
 
+    class FilingDetailTemplate(models.TextChoices):
+        NONE = LEAVE_APPLICATION_DETAIL_TEMPLATE_NONE, "No Special Filing Details"
+        TRAVEL = LEAVE_APPLICATION_DETAIL_TEMPLATE_TRAVEL, "Travel Details"
+        SICK = LEAVE_APPLICATION_DETAIL_TEMPLATE_SICK, "Sick Leave Details"
+        PATERNITY = LEAVE_APPLICATION_DETAIL_TEMPLATE_PATERNITY, "Paternity Leave Details"
+        STUDY = LEAVE_APPLICATION_DETAIL_TEMPLATE_STUDY, "Study Leave Details"
+        WOMEN_SURGERY = LEAVE_APPLICATION_DETAIL_TEMPLATE_WOMEN_SURGERY, "Women's Surgery Details"
+        CUSTOM = LEAVE_APPLICATION_DETAIL_TEMPLATE_CUSTOM, "Custom Structured Filing Details"
+
     leave_type = models.OneToOneField(
         LeaveType,
         on_delete=models.CASCADE,
@@ -276,6 +297,13 @@ class LeaveTypeRule(models.Model):
     eligibility_notes = models.TextField(blank=True)
     filing_notes = models.TextField(blank=True)
     rule_notes = models.TextField(blank=True)
+    filing_detail_template = models.CharField(
+        max_length=30,
+        choices=FilingDetailTemplate.choices,
+        default=FilingDetailTemplate.NONE,
+    )
+    travel_abroad_notice_days = models.PositiveSmallIntegerField(null=True, blank=True)
+    application_detail_schema = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"Rules for {self.leave_type.leave_name}"
@@ -327,6 +355,43 @@ class LeaveTypeRule(models.Model):
         ):
             errors["max_consecutive_days"] = (
                 "Maximum consecutive days cannot exceed the configured entitlement value."
+            )
+
+        if self.filing_detail_template == self.FilingDetailTemplate.CUSTOM:
+            try:
+                self.application_detail_schema = normalize_leave_application_detail_schema(
+                    self.application_detail_schema
+                )
+            except ValidationError as exc:
+                errors["application_detail_schema"] = exc.messages
+            else:
+                if not self.application_detail_schema:
+                    errors["application_detail_schema"] = (
+                        "Provide at least one structured filing field when using the custom filing-detail template."
+                    )
+        else:
+            try:
+                self.application_detail_schema = build_leave_application_detail_schema(
+                    self.filing_detail_template
+                )
+            except ValidationError as exc:
+                errors["filing_detail_template"] = exc.messages
+
+        if (
+            self.travel_abroad_notice_days is not None
+            and self.filing_detail_template != self.FilingDetailTemplate.TRAVEL
+        ):
+            errors["travel_abroad_notice_days"] = (
+                "Travel abroad notice days only apply to leave types that collect travel details."
+            )
+
+        if (
+            self.travel_abroad_notice_days is not None
+            and self.advance_notice_days is not None
+            and self.travel_abroad_notice_days < self.advance_notice_days
+        ):
+            errors["travel_abroad_notice_days"] = (
+                "Travel-abroad notice days cannot be lower than the general advance filing days."
             )
 
         if errors:
@@ -526,6 +591,7 @@ class LeaveApplication(models.Model):
     )
     approved_at = models.DateTimeField(null=True, blank=True)
     rule_snapshot = models.JSONField(default=dict, blank=True)
+    application_details = models.JSONField(default=dict, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
     created_by = models.CharField(max_length=100, null=True, blank=True)
@@ -552,3 +618,58 @@ class LeaveApplication(models.Model):
 
         if errors:
             raise ValidationError(errors)
+
+
+class LeaveApplicationApproval(models.Model):
+    class ApprovalRole(models.TextChoices):
+        IMMEDIATE_SUPERVISOR = "immediate_supervisor", "Immediate Supervisor"
+        DIVISION_CHIEF = "division_chief", "Division Chief"
+        HR_APPROVER = "hr_approver", "HR Approver"
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        SKIPPED = "skipped", "Skipped"
+
+    leave_application_approval_id = models.AutoField(primary_key=True)
+    leave_application = models.ForeignKey(
+        LeaveApplication,
+        on_delete=models.CASCADE,
+        related_name="approvals",
+    )
+    approver_employee = models.ForeignKey(
+        "employee_modules.Employee",
+        on_delete=models.CASCADE,
+        related_name="leave_approval_queue",
+    )
+    approver_role = models.CharField(
+        max_length=30,
+        choices=ApprovalRole.choices,
+    )
+    sequence = models.PositiveSmallIntegerField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    decision_notes = models.TextField(blank=True)
+    acted_at = models.DateTimeField(null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["leave_application__created", "sequence", "leave_application_approval_id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["leave_application", "approver_role"],
+                name="unique_leave_application_approver_role",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.leave_application} - "
+            f"{self.get_approver_role_display()} - {self.get_status_display()}"
+        )

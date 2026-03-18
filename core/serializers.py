@@ -6,12 +6,24 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
+from core.approval_workflow import (
+    approve_leave_approval,
+    reject_leave_approval,
+    sync_leave_approval_queue,
+)
+from core.leave_policy import (
+    infer_leave_application_detail_template,
+    format_leave_application_detail_summary,
+    normalize_leave_application_details,
+    normalize_leave_application_detail_schema,
+)
 from employee_modules.models import Employee, EmployeePersonalDataSheet
 from core.models import (
     CSCPlantilla,
     Division,
     EmployeeLeaveCredit,
     EmployeeLeaveCreditLedger,
+    LeaveApplicationApproval,
     LeaveType,
     LeaveApplication,
     LeaveTypeRule,
@@ -19,16 +31,18 @@ from core.models import (
     SalaryGrade,
     TimeRule,
 )
+from core.rbac import can_access_hr_portal, get_user_employee
 from hr_modules.models import Approver
 
 class EmployeeSerializer(serializers.ModelSerializer):
     division_name = serializers.CharField(source='division.division_name', read_only=True)
     position_name = serializers.CharField(source='position.position_name', read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
     
     class Meta:
         model = Employee
         fields = ['id','employee_id','first_name','last_name','middle_name',
-                  'name_extension','position','division','division_name', 'position_name']
+                  'name_extension','position','division','division_name', 'position_name', 'username']
 
 
 class EmployeePersonalDataSheetSerializer(serializers.ModelSerializer):
@@ -387,6 +401,24 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
         allow_blank=True,
         required=False,
     )
+    filing_detail_template = serializers.ChoiceField(
+        source="rule.filing_detail_template",
+        choices=LeaveTypeRule.FilingDetailTemplate.choices,
+        required=False,
+    )
+    filing_detail_template_label = serializers.ReadOnlyField(
+        source="rule.get_filing_detail_template_display"
+    )
+    travel_abroad_notice_days = serializers.IntegerField(
+        source="rule.travel_abroad_notice_days",
+        allow_null=True,
+        required=False,
+        min_value=0,
+    )
+    application_detail_schema = serializers.JSONField(
+        source="rule.application_detail_schema",
+        required=False,
+    )
 
     class Meta:
         model = LeaveType
@@ -423,6 +455,10 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
             "eligibility_notes",
             "filing_notes",
             "rule_notes",
+            "filing_detail_template",
+            "filing_detail_template_label",
+            "travel_abroad_notice_days",
+            "application_detail_schema",
             "created",
             "modified",
             "created_by",
@@ -449,7 +485,10 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
         for key, value in leave_attrs.items():
             setattr(leave_type, key, value)
 
-        rule = getattr(self.instance, "rule", LeaveTypeRule(leave_type=self.instance))
+        rule = LeaveTypeRule.objects.filter(leave_type=self.instance).first()
+        if rule is None:
+            rule = LeaveTypeRule(leave_type=self.instance)
+
         for key, value in rule_attrs.items():
             setattr(rule, key, value)
 
@@ -473,6 +512,18 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         self._apply_default_balance_tracking(attrs)
+        rule_attrs = attrs.setdefault("rule", {})
+
+        if "filing_detail_template" not in rule_attrs and "application_detail_schema" in rule_attrs:
+            try:
+                rule_attrs["filing_detail_template"] = infer_leave_application_detail_template(
+                    rule_attrs["application_detail_schema"]
+                )
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({
+                    "application_detail_schema": exc.messages,
+                }) from exc
+
         leave_type, rule = self._candidate_instances(attrs)
         errors = {}
 
@@ -489,6 +540,8 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError(errors)
 
+        attrs.setdefault("rule", {})["application_detail_schema"] = rule.application_detail_schema
+        attrs.setdefault("rule", {})["filing_detail_template"] = rule.filing_detail_template
         return attrs
 
     def create(self, validated_data):
@@ -615,6 +668,7 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
         "reason",
         "supporting_document_reference",
         "supporting_document_notes",
+        "application_details",
     }
 
     employee_name = serializers.SerializerMethodField(read_only=True)
@@ -626,12 +680,18 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     available_balance = serializers.SerializerMethodField(read_only=True)
     entitlement_summary = serializers.SerializerMethodField(read_only=True)
+    current_approval_role = serializers.SerializerMethodField(read_only=True)
+    current_approval_role_label = serializers.SerializerMethodField(read_only=True)
+    current_approver_name = serializers.SerializerMethodField(read_only=True)
+    approval_progress = serializers.SerializerMethodField(read_only=True)
+    application_detail_summary = serializers.SerializerMethodField(read_only=True)
     requested_units = serializers.DecimalField(
         max_digits=8,
         decimal_places=2,
         required=False,
         allow_null=True,
     )
+    application_details = serializers.JSONField(required=False)
 
     class Meta:
         model = LeaveApplication
@@ -653,10 +713,16 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
             "reason",
             "supporting_document_reference",
             "supporting_document_notes",
+            "application_details",
+            "application_detail_summary",
             "balance_bucket_code",
             "deducted_units",
             "available_balance",
             "entitlement_summary",
+            "current_approval_role",
+            "current_approval_role_label",
+            "current_approver_name",
+            "approval_progress",
             "approved_at",
             "rule_snapshot",
             "created",
@@ -689,6 +755,45 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
     def get_entitlement_summary(self, obj):
         rule = getattr(obj.leave_type, "rule", None)
         return rule.entitlement_summary() if rule else ""
+
+    def _get_application_detail_schema(self, leave_type, instance=None):
+        if instance and isinstance(instance.rule_snapshot, dict):
+            snapshot_schema = instance.rule_snapshot.get("application_detail_schema")
+            if snapshot_schema not in (None, ""):
+                return snapshot_schema
+
+        return getattr(leave_type.rule, "application_detail_schema", [])
+
+    def get_application_detail_summary(self, obj):
+        schema = self._get_application_detail_schema(obj.leave_type, instance=obj)
+        return format_leave_application_detail_summary(schema, obj.application_details)
+
+    def _get_pending_approval(self, obj):
+        return obj.approvals.filter(status=LeaveApplicationApproval.Status.PENDING).order_by("sequence").first()
+
+    def get_current_approval_role(self, obj):
+        pending_approval = self._get_pending_approval(obj)
+        return pending_approval.approver_role if pending_approval else ""
+
+    def get_current_approval_role_label(self, obj):
+        pending_approval = self._get_pending_approval(obj)
+        return pending_approval.get_approver_role_display() if pending_approval else ""
+
+    def get_current_approver_name(self, obj):
+        pending_approval = self._get_pending_approval(obj)
+        if pending_approval is None:
+            return ""
+
+        approver = pending_approval.approver_employee
+        return f"{approver.first_name} {approver.last_name}"
+
+    def get_approval_progress(self, obj):
+        total_steps = obj.approvals.count()
+        if total_steps == 0:
+            return "No approver route configured"
+
+        approved_steps = obj.approvals.filter(status=LeaveApplicationApproval.Status.APPROVED).count()
+        return f"{approved_steps} of {total_steps} approval step(s) completed"
 
     def _resolve_requested_units(self, leave_type, start_date, end_date, requested_units):
         rule = leave_type.rule
@@ -741,11 +846,17 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
             "entitlement_period_label": rule.get_entitlement_period_display(),
             "entitlement_summary": rule.entitlement_summary(),
             "advance_notice_days": rule.advance_notice_days,
+            "travel_abroad_notice_days": rule.travel_abroad_notice_days,
             "max_consecutive_days": str(rule.max_consecutive_days) if rule.max_consecutive_days is not None else None,
             "requires_supporting_document": rule.requires_supporting_document,
             "supporting_document_notes": rule.supporting_document_notes,
             "balance_bucket_code": bucket.get("bucket_code"),
             "balance_bucket_name": bucket.get("bucket_name"),
+            "filing_detail_template": rule.filing_detail_template,
+            "filing_detail_template_label": rule.get_filing_detail_template_display(),
+            "application_detail_schema": normalize_leave_application_detail_schema(
+                rule.application_detail_schema
+            ),
         }
 
     def _get_effective_balance(self, *, employee, bucket_code, instance=None):
@@ -782,6 +893,10 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
             "supporting_document_notes",
             getattr(self.instance, "supporting_document_notes", ""),
         )
+        application_details = attrs.get(
+            "application_details",
+            getattr(self.instance, "application_details", {}),
+        )
 
         if not employee or not leave_type or not start_date or not end_date:
             return attrs
@@ -809,6 +924,11 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(exc.message_dict)
 
         rule = leave_type.rule
+        detail_schema = (
+            leave_type.rule.application_detail_schema
+            if "leave_type" in attrs
+            else self._get_application_detail_schema(leave_type, instance=self.instance)
+        )
         calculated_units = self._resolve_requested_units(
             leave_type,
             start_date,
@@ -817,16 +937,54 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
         )
         attrs["requested_units"] = calculated_units
 
+        try:
+            attrs["application_details"] = normalize_leave_application_details(
+                detail_schema,
+                application_details,
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({
+                "application_details": exc.messages,
+            })
+
         errors = {}
         today = timezone.localdate()
+        is_finalizing_existing_submission = (
+            self.instance is not None
+            and self.instance.status == LeaveApplication.Status.SUBMITTED
+            and status in {
+                LeaveApplication.Status.APPROVED,
+                LeaveApplication.Status.REJECTED,
+                LeaveApplication.Status.CANCELLED,
+            }
+            and self.instance.start_date == start_date
+            and self.instance.end_date == end_date
+        )
 
         if (
             rule.advance_notice_days is not None
             and status in {LeaveApplication.Status.SUBMITTED, LeaveApplication.Status.APPROVED}
+            and not is_finalizing_existing_submission
             and start_date < today + timedelta(days=rule.advance_notice_days)
         ):
             errors["start_date"] = [
                 f"This leave type should be filed at least {rule.advance_notice_days} day(s) before the start date."
+            ]
+
+        travel_scope = str(attrs["application_details"].get("travel_scope", "")).strip().lower()
+        if (
+            rule.filing_detail_template == LeaveTypeRule.FilingDetailTemplate.TRAVEL
+            and travel_scope == "abroad"
+            and rule.travel_abroad_notice_days is not None
+            and status in {LeaveApplication.Status.SUBMITTED, LeaveApplication.Status.APPROVED}
+            and not is_finalizing_existing_submission
+            and start_date < today + timedelta(days=rule.travel_abroad_notice_days)
+        ):
+            errors["start_date"] = [
+                (
+                    "Travel abroad requests for this leave type should be filed at least "
+                    f"{rule.travel_abroad_notice_days} day(s) before the start date."
+                )
             ]
 
         if (
@@ -922,6 +1080,8 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
                     notes=f"Approved {application.leave_type.leave_name} application.",
                 )
 
+            sync_leave_approval_queue(application)
+
             return application
 
     def update(self, instance, validated_data):
@@ -987,7 +1147,167 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
                     notes=f"Approved {instance.leave_type.leave_name} application.",
                 )
 
+            sync_leave_approval_queue(instance)
             return instance
+
+
+class LeaveApplicationApprovalSerializer(serializers.ModelSerializer):
+    approver_name = serializers.SerializerMethodField(read_only=True)
+    approver_role_label = serializers.CharField(source="get_approver_role_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    application_status = serializers.CharField(source="leave_application.status", read_only=True)
+    application_status_label = serializers.CharField(source="leave_application.get_status_display", read_only=True)
+    employee = serializers.IntegerField(source="leave_application.employee.pk", read_only=True)
+    employee_name = serializers.SerializerMethodField(read_only=True)
+    employee_number = serializers.CharField(source="leave_application.employee.employee_id", read_only=True)
+    leave_type = serializers.IntegerField(source="leave_application.leave_type.pk", read_only=True)
+    leave_type_name = serializers.CharField(source="leave_application.leave_type.leave_name", read_only=True)
+    leave_code = serializers.CharField(source="leave_application.leave_type.leave_code", read_only=True)
+    start_date = serializers.DateField(source="leave_application.start_date", read_only=True)
+    end_date = serializers.DateField(source="leave_application.end_date", read_only=True)
+    requested_units = serializers.DecimalField(
+        source="leave_application.requested_units",
+        max_digits=8,
+        decimal_places=2,
+        read_only=True,
+    )
+    reason = serializers.CharField(source="leave_application.reason", read_only=True)
+    supporting_document_reference = serializers.CharField(
+        source="leave_application.supporting_document_reference",
+        read_only=True,
+    )
+    supporting_document_notes = serializers.CharField(
+        source="leave_application.supporting_document_notes",
+        read_only=True,
+    )
+    application_details = serializers.JSONField(
+        source="leave_application.application_details",
+        read_only=True,
+    )
+    application_detail_summary = serializers.SerializerMethodField(read_only=True)
+    approval_progress = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = LeaveApplicationApproval
+        fields = [
+            "leave_application_approval_id",
+            "leave_application",
+            "approver_employee",
+            "approver_name",
+            "approver_role",
+            "approver_role_label",
+            "sequence",
+            "status",
+            "status_label",
+            "decision_notes",
+            "acted_at",
+            "application_status",
+            "application_status_label",
+            "employee",
+            "employee_name",
+            "employee_number",
+            "leave_type",
+            "leave_type_name",
+            "leave_code",
+            "start_date",
+            "end_date",
+            "requested_units",
+            "reason",
+            "supporting_document_reference",
+            "supporting_document_notes",
+            "application_details",
+            "application_detail_summary",
+            "approval_progress",
+            "created",
+            "modified",
+        ]
+        read_only_fields = [
+            "leave_application",
+            "approver_employee",
+            "approver_name",
+            "approver_role_label",
+            "status_label",
+            "acted_at",
+            "application_status",
+            "application_status_label",
+            "employee",
+            "employee_name",
+            "employee_number",
+            "leave_type",
+            "leave_type_name",
+            "leave_code",
+            "start_date",
+            "end_date",
+            "requested_units",
+            "reason",
+            "supporting_document_reference",
+            "supporting_document_notes",
+            "approval_progress",
+            "created",
+            "modified",
+        ]
+
+    def get_approver_name(self, obj):
+        approver = obj.approver_employee
+        return f"{approver.first_name} {approver.last_name}"
+
+    def get_employee_name(self, obj):
+        employee = obj.leave_application.employee
+        return f"{employee.first_name} {employee.last_name}"
+
+    def get_application_detail_summary(self, obj):
+        snapshot_schema = []
+        if isinstance(obj.leave_application.rule_snapshot, dict):
+            snapshot_schema = obj.leave_application.rule_snapshot.get("application_detail_schema") or []
+
+        return format_leave_application_detail_summary(
+            snapshot_schema or getattr(obj.leave_application.leave_type.rule, "application_detail_schema", []),
+            obj.leave_application.application_details,
+        )
+
+    def get_approval_progress(self, obj):
+        approvals = obj.leave_application.approvals.all()
+        approved_steps = approvals.filter(status=LeaveApplicationApproval.Status.APPROVED).count()
+        return f"{approved_steps} of {approvals.count()} approval step(s) completed"
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        target_status = attrs.get("status")
+
+        if target_status not in {
+            LeaveApplicationApproval.Status.APPROVED,
+            LeaveApplicationApproval.Status.REJECTED,
+        }:
+            raise serializers.ValidationError({
+                "status": ["Approver decisions must be either approved or rejected."],
+            })
+
+        if self.instance.status != LeaveApplicationApproval.Status.PENDING:
+            raise serializers.ValidationError({
+                "status": ["Only pending approval steps can be acted on."],
+            })
+
+        if request is None or not request.user.is_authenticated:
+            raise serializers.ValidationError({
+                "non_field_errors": ["Authentication is required to approve filings."],
+            })
+
+        user_employee = get_user_employee(request.user)
+        if not can_access_hr_portal(request.user) and user_employee != self.instance.approver_employee:
+            raise serializers.ValidationError({
+                "non_field_errors": ["This approval step is not assigned to your account."],
+            })
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        decision_notes = validated_data.get("decision_notes", "")
+        target_status = validated_data.get("status")
+
+        if target_status == LeaveApplicationApproval.Status.APPROVED:
+            return approve_leave_approval(instance, decision_notes)
+
+        return reject_leave_approval(instance, decision_notes)
         
 class ApproverSerializer(serializers.ModelSerializer):
     approval_type = serializers.ChoiceField(choices=Approver.ApprovalType.choices)

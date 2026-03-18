@@ -150,6 +150,20 @@
                                             <label class="form-label" for="add-filing-notes">Filing Notes</label>
                                             <textarea id="add-filing-notes" name="filing_notes" class="form-control" rows="3"></textarea>
                                         </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="add-filing-detail-template">Leave-Specific Filing Rule</label>
+                                            <select id="add-filing-detail-template" name="filing_detail_template" class="form-select"></select>
+                                            <div class="form-text" id="add-filing-detail-template-help">
+                                                No additional leave-specific filing questions will appear to employees for this leave type.
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-3 d-none" id="add-travel-abroad-notice-group">
+                                            <label class="form-label" for="add-travel-abroad-notice-days">If Travelling Abroad, Notice Days</label>
+                                            <input id="add-travel-abroad-notice-days" name="travel_abroad_notice_days" type="number" min="0" class="form-control">
+                                            <div class="form-text">
+                                                Leave blank to use the general advance filing days. Set this only if your agency requires longer notice for foreign travel.
+                                            </div>
+                                        </div>
                                         <div class="col-md-12 mb-0">
                                             <label class="form-label" for="add-rule-notes">Rule Notes</label>
                                             <textarea id="add-rule-notes" name="rule_notes" class="form-control" rows="3"></textarea>

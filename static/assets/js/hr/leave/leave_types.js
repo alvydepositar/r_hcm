@@ -82,6 +82,17 @@ const leaveCategoryLookup = new Map(leaveCategoryOptions.map(option => [option.v
 const leaveEntitlementUnitLookup = new Map(leaveEntitlementUnitOptions.map(option => [option.value, option.label]));
 const leaveEntitlementPeriodLookup = new Map(leaveEntitlementPeriodOptions.map(option => [option.value, option.label]));
 const leaveCompensationLookup = new Map(leaveCompensationOptions.map(option => [option.value, option.label]));
+const leaveFilingTemplateOptions = [
+    { value: "none", label: "No Special Filing Details" },
+    { value: "travel", label: "Travel Details" },
+    { value: "sick", label: "Sick Leave Details" },
+    { value: "paternity", label: "Paternity Leave Details" },
+    { value: "study", label: "Study Leave Details" },
+    { value: "women_surgery", label: "Women's Surgery Details" },
+    { value: "custom", label: "Custom Structured Filing Details" },
+];
+const leaveFilingTemplateFormOptions = leaveFilingTemplateOptions.filter(option => option.value !== "custom");
+const leaveFilingTemplateLookup = new Map(leaveFilingTemplateOptions.map(option => [option.value, option.label]));
 const leaveTypeViewFields = [
     { label: "Leave Code", field: "leave_code" },
     { label: "Leave Type", field: "leave_name" },
@@ -103,6 +114,26 @@ const leaveTypeViewFields = [
         label: "Requires Supporting Document",
         field: "requires_supporting_document",
         format: ({ value }) => parseBooleanValue(value) ? "Yes" : "No",
+    },
+    {
+        label: "Leave-Specific Filing Rule",
+        field: "filing_detail_template",
+        editField: "filing_detail_template",
+        format: ({ value }) => formatOptionLabel(leaveFilingTemplateLookup, value),
+    },
+    {
+        label: "Travel Abroad Notice Days",
+        field: "travel_abroad_notice_days",
+        editField: "travel_abroad_notice_days",
+        format: ({ rowData, value }) => rowData.filing_detail_template === "travel"
+            ? formatNullableInteger(value)
+            : "Not applicable",
+    },
+    {
+        label: "Filing Details Collected",
+        field: "application_detail_schema",
+        fullWidth: true,
+        format: ({ value }) => formatLeaveTypeApplicationDetailSummary(value),
     },
     { label: "Supporting Document Notes", field: "supporting_document_notes", fullWidth: true },
     { label: "Eligibility Notes", field: "eligibility_notes", fullWidth: true },
@@ -127,8 +158,18 @@ const leaveEditableFields = [
     "entitlement_value",
     "entitlement_unit",
     "entitlement_period",
+    "min_service_months_required",
+    "advance_notice_days",
+    "max_consecutive_days",
     "requires_earned_leave_credits",
+    "allows_intermittent",
     "requires_supporting_document",
+    "supporting_document_notes",
+    "eligibility_notes",
+    "filing_notes",
+    "rule_notes",
+    "filing_detail_template",
+    "travel_abroad_notice_days",
 ];
 
 const leaveDerivedFields = [
@@ -195,12 +236,81 @@ function formatNullableNumber(value) {
     return Number.isInteger(parsed) ? String(parsed) : parsed.toFixed(2);
 }
 
+function formatNullableInteger(value) {
+    if (value === null || value === undefined || value === "") {
+        return "";
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? value : String(parsed);
+}
+
 function formatOptionLabel(lookup, value) {
     if (value === null || value === undefined || value === "") {
         return "";
     }
 
     return lookup.get(String(value)) || value;
+}
+
+function normalizeLeaveTypeApplicationDetailSchema(value) {
+    if (Array.isArray(value)) {
+        return normalizeLeaveApplicationDetailSchema(value);
+    }
+
+    if (value === null || value === undefined || String(value).trim() === "") {
+        return [];
+    }
+
+    const parsed = JSON.parse(String(value));
+    return normalizeLeaveApplicationDetailSchema(parsed);
+}
+
+function formatLeaveTypeApplicationDetailSchema(value) {
+    const normalizedSchema = normalizeLeaveApplicationDetailSchema(value);
+    if (!normalizedSchema.length) {
+        return "No additional leave-specific filing details.";
+    }
+
+    return normalizedSchema
+        .map(field => field.label)
+        .join(", ");
+}
+
+function parseLeaveTypeApplicationDetailSchema(value) {
+    return normalizeLeaveTypeApplicationDetailSchema(value);
+}
+
+function formatLeaveTypeApplicationDetailSummary(value) {
+    return formatLeaveTypeApplicationDetailSchema(value);
+}
+
+function getLeaveFilingTemplateHelpText(template) {
+    if (template === "travel") {
+        return "Collects travel scope and destination during filing. Use the abroad notice field if your agency requires longer notice for foreign travel.";
+    }
+
+    if (template === "sick") {
+        return "Collects the medical context and illness / treatment details required by the CSC leave form.";
+    }
+
+    if (template === "paternity") {
+        return "Collects the spouse's name, childbirth or miscarriage case, delivery date, and qualifying delivery count.";
+    }
+
+    if (template === "study") {
+        return "Collects the study leave purpose required by the CSC leave form.";
+    }
+
+    if (template === "women_surgery") {
+        return "Collects the surgery details required for Special Leave Benefits for Women.";
+    }
+
+    if (template === "custom") {
+        return "This leave type uses a custom structured filing layout that is managed outside the standard HR form.";
+    }
+
+    return "No additional leave-specific filing questions will appear to employees for this leave type.";
 }
 
 function formatBooleanBadge(value) {
@@ -264,19 +374,30 @@ const leaveTypeRowEditor = createTableRowEditor({
     bulkDeleteConfirmMessage: "Delete the selected leave types?",
     prepareModalRowData: rowData => buildLeaveTypeDisplayRow(
         syncLeaveTypeCompensation(
-            rowData,
+            { ...rowData },
             rowData.compensation_rule || buildCompensationRuleValue(rowData),
         ),
     ),
+    isModalFieldEditable: ({ field, rowData }) => {
+        if (field === "travel_abroad_notice_days") {
+            return rowData.filing_detail_template === "travel";
+        }
+
+        return true;
+    },
     onSaveSuccess: ({ row }) => {
         row.update(buildLeaveTypeDisplayRow(row.getData()));
     },
     serializeFieldValue: ({ field, value }) => {
-        if (field === "entitlement_value") {
+        if (["entitlement_value", "min_service_months_required", "max_consecutive_days"].includes(field)) {
             return parseNullableDecimal(value);
         }
 
-        if (["is_active", "requires_earned_leave_credits", "requires_supporting_document"].includes(field)) {
+        if (["advance_notice_days", "travel_abroad_notice_days"].includes(field)) {
+            return parseNullableInteger(value);
+        }
+
+        if (["is_active", "requires_earned_leave_credits", "allows_intermittent", "requires_supporting_document"].includes(field)) {
             return parseBooleanValue(value);
         }
 
@@ -407,6 +528,19 @@ const leaveTypeFactory = new tableFactory({
             hozAlign: "center",
         },
         {
+            title: "Filing Rule",
+            field: "filing_detail_template",
+            editor: searchableDropdownEditor,
+            editorParams: () => buildLeaveListEditorParams(leaveFilingTemplateOptions, {
+                placeholder: "Select filing rule",
+                searchPlaceholder: "Search filing rules",
+            }),
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            formatter: cell => formatOptionLabel(leaveFilingTemplateLookup, cell.getValue()),
+            headerSort: true,
+            width: 220,
+        },
+        {
             title: "CSC Basis",
             field: "legal_basis",
             editor: "input",
@@ -422,6 +556,78 @@ const leaveTypeFactory = new tableFactory({
             headerSort: true,
             width: 260,
             formatter: "textarea",
+        },
+        {
+            title: "Min Service Months",
+            field: "min_service_months_required",
+            editor: "input",
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            formatter: cell => formatNullableNumber(cell.getValue()),
+            visible: false,
+        },
+        {
+            title: "Advance Filing Days",
+            field: "advance_notice_days",
+            editor: "input",
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            formatter: cell => formatNullableInteger(cell.getValue()),
+            visible: false,
+        },
+        {
+            title: "Travel Abroad Notice Days",
+            field: "travel_abroad_notice_days",
+            editor: "input",
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            formatter: cell => formatNullableInteger(cell.getValue()),
+            visible: false,
+        },
+        {
+            title: "Max Consecutive Days",
+            field: "max_consecutive_days",
+            editor: "input",
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            formatter: cell => formatNullableNumber(cell.getValue()),
+            visible: false,
+        },
+        {
+            title: "Allows Intermittent",
+            field: "allows_intermittent",
+            editor: searchableDropdownEditor,
+            editorParams: () => buildLeaveListEditorParams(leaveBooleanOptions, {
+                placeholder: "Select option",
+                searchPlaceholder: "Search options",
+            }),
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            formatter: cell => formatBooleanBadge(cell.getValue()),
+            visible: false,
+        },
+        {
+            title: "Supporting Document Notes",
+            field: "supporting_document_notes",
+            editor: "textarea",
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            visible: false,
+        },
+        {
+            title: "Eligibility Notes",
+            field: "eligibility_notes",
+            editor: "textarea",
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            visible: false,
+        },
+        {
+            title: "Filing Notes",
+            field: "filing_notes",
+            editor: "textarea",
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            visible: false,
+        },
+        {
+            title: "Rule Notes",
+            field: "rule_notes",
+            editor: "textarea",
+            editable: cell => leaveTypeRowEditor.isEditingRow(cell.getRow().getData()),
+            visible: false,
         },
         {
             title: "Active",
@@ -467,6 +673,10 @@ const leaveTypeEntitlementValueInput = document.getElementById("add-entitlement-
 const leaveTypeRequiresCreditsInput = document.getElementById("add-requires-earned-leave-credits");
 const leaveTypeRequiresSupportingDocumentInput = document.getElementById("add-requires-supporting-document");
 const leaveTypeSupportingDocumentNotesInput = document.getElementById("add-supporting-document-notes");
+const leaveTypeFilingDetailTemplateSelect = document.getElementById("add-filing-detail-template");
+const leaveTypeFilingDetailTemplateHelp = document.getElementById("add-filing-detail-template-help");
+const leaveTypeTravelAbroadNoticeGroup = document.getElementById("add-travel-abroad-notice-group");
+const leaveTypeTravelAbroadNoticeInput = document.getElementById("add-travel-abroad-notice-days");
 
 function getNextLeaveTypeSortOrder() {
     const currentRows = leaveTypeTable.getData();
@@ -505,15 +715,30 @@ function syncSupportingDocumentInputs() {
     }
 }
 
+function syncLeaveTypeFilingDetailInputs() {
+    const filingDetailTemplate = leaveTypeFilingDetailTemplateSelect.value || "none";
+    const usesTravelRule = filingDetailTemplate === "travel";
+
+    leaveTypeFilingDetailTemplateHelp.textContent = getLeaveFilingTemplateHelpText(filingDetailTemplate);
+    leaveTypeTravelAbroadNoticeGroup.classList.toggle("d-none", !usesTravelRule);
+    leaveTypeTravelAbroadNoticeInput.disabled = !usesTravelRule;
+
+    if (!usesTravelRule) {
+        leaveTypeTravelAbroadNoticeInput.value = "";
+    }
+}
+
 function populateLeaveTypeModalOptions() {
     populateLookupSelect(leaveTypeCategorySelect, leaveCategoryOptions, "Select class");
     populateLookupSelect(leaveTypeCompensationSelect, leaveCompensationOptions, "Select charge rule");
     populateLookupSelect(leaveTypeEntitlementUnitSelect, leaveEntitlementUnitOptions, "Select unit");
     populateLookupSelect(leaveTypeEntitlementPeriodSelect, leaveEntitlementPeriodOptions, "Select frequency");
+    populateLookupSelect(leaveTypeFilingDetailTemplateSelect, leaveFilingTemplateFormOptions, "Select filing rule");
     refreshSearchableSelect(leaveTypeCategorySelect);
     refreshSearchableSelect(leaveTypeCompensationSelect);
     refreshSearchableSelect(leaveTypeEntitlementUnitSelect);
     refreshSearchableSelect(leaveTypeEntitlementPeriodSelect);
+    refreshSearchableSelect(leaveTypeFilingDetailTemplateSelect);
     refreshSearchableSelect(leaveTypeStatusSelect);
 }
 
@@ -542,6 +767,8 @@ function buildLeaveTypePayload() {
         supporting_document_notes: leaveTypeSupportingDocumentNotesInput.value.trim(),
         eligibility_notes: document.getElementById("add-eligibility-notes").value.trim(),
         filing_notes: document.getElementById("add-filing-notes").value.trim(),
+        filing_detail_template: leaveTypeFilingDetailTemplateSelect.value || "none",
+        travel_abroad_notice_days: parseNullableInteger(leaveTypeTravelAbroadNoticeInput.value),
         rule_notes: document.getElementById("add-rule-notes").value.trim(),
     };
 }
@@ -554,6 +781,7 @@ populateLeaveTypeModalOptions();
 syncLeaveTypeCompensationInputs();
 syncLeaveTypeEntitlementInputs();
 syncSupportingDocumentInputs();
+syncLeaveTypeFilingDetailInputs();
 
 document.getElementById("add-leave-type-btn").addEventListener("click", () => {
     leaveTypeForm.reset();
@@ -564,12 +792,14 @@ document.getElementById("add-leave-type-btn").addEventListener("click", () => {
     syncLeaveTypeCompensationInputs();
     syncLeaveTypeEntitlementInputs();
     syncSupportingDocumentInputs();
+    syncLeaveTypeFilingDetailInputs();
     leaveTypeModal.show();
 });
 
 leaveTypeCompensationSelect.addEventListener("change", syncLeaveTypeCompensationInputs);
 leaveTypeEntitlementUnitSelect.addEventListener("change", syncLeaveTypeEntitlementInputs);
 leaveTypeRequiresSupportingDocumentInput.addEventListener("change", syncSupportingDocumentInputs);
+leaveTypeFilingDetailTemplateSelect.addEventListener("change", syncLeaveTypeFilingDetailInputs);
 
 document.getElementById("delete-selected-leave-types-btn").addEventListener("click", () => {
     leaveTypeRowEditor.deleteSelectedRows({
@@ -580,15 +810,33 @@ document.getElementById("delete-selected-leave-types-btn").addEventListener("cli
 leaveTypeForm.addEventListener("submit", async event => {
     event.preventDefault();
 
-    const payload = buildLeaveTypePayload();
+    let payload;
+    try {
+        payload = buildLeaveTypePayload();
+    } catch (err) {
+        showSystemToast({
+            title: "Leave Type Error",
+            message: err.message,
+            tone: "danger",
+        });
+        return;
+    }
 
     if (!payload.leave_code || !payload.leave_name || !payload.category || !payload.pay_status) {
-        alert("Please complete the leave code, leave type, leave class, and charge-against rule.");
+        showSystemToast({
+            title: "Incomplete Leave Type",
+            message: "Please complete the leave code, leave type, leave class, and charge-against rule.",
+            tone: "warning",
+        });
         return;
     }
 
     if (!payload.entitlement_unit || !payload.entitlement_period) {
-        alert("Please select the entitlement unit and availment frequency.");
+        showSystemToast({
+            title: "Incomplete Leave Type",
+            message: "Please select the entitlement unit and availment frequency.",
+            tone: "warning",
+        });
         return;
     }
 
@@ -610,7 +858,16 @@ leaveTypeForm.addEventListener("submit", async event => {
         leaveTypeForm.reset();
         leaveTypeRowEditor.reset();
         leaveTypeTable.replaceData();
+        showSystemToast({
+            title: "Leave Type Saved",
+            message: "The leave type rule has been added.",
+            tone: "success",
+        });
     } catch (err) {
-        alert(err.message);
+        showSystemToast({
+            title: "Leave Type Error",
+            message: err.message,
+            tone: "danger",
+        });
     }
 });

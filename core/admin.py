@@ -6,6 +6,7 @@ from .models import (
     EmployeeLeaveCredit,
     EmployeeLeaveCreditLedger,
     LeaveApplication,
+    LeaveApplicationApproval,
     LeaveType,
     LeaveTypeRule,
     Position,
@@ -87,6 +88,22 @@ class EmployeeLeaveCreditLedgerInline(admin.TabularInline):
     )
 
 
+class LeaveApplicationApprovalInline(admin.TabularInline):
+    model = LeaveApplicationApproval
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        "approver_employee",
+        "approver_role",
+        "sequence",
+        "status",
+        "decision_notes",
+        "acted_at",
+        "created",
+        "modified",
+    )
+
+
 @admin.register(EmployeeLeaveCredit)
 class EmployeeLeaveCreditAdmin(admin.ModelAdmin):
     list_display = (
@@ -127,4 +144,27 @@ class LeaveApplicationAdmin(admin.ModelAdmin):
         "employee__last_name",
         "leave_type__leave_name",
         "leave_type__leave_code",
+    )
+    inlines = (LeaveApplicationApprovalInline,)
+
+
+@admin.register(LeaveApplicationApproval)
+class LeaveApplicationApprovalAdmin(admin.ModelAdmin):
+    list_display = (
+        "leave_application_approval_id",
+        "leave_application",
+        "approver_employee",
+        "approver_role",
+        "sequence",
+        "status",
+        "acted_at",
+    )
+    list_filter = ("status", "approver_role")
+    search_fields = (
+        "leave_application__employee__employee_id",
+        "leave_application__employee__first_name",
+        "leave_application__employee__last_name",
+        "approver_employee__employee_id",
+        "approver_employee__first_name",
+        "approver_employee__last_name",
     )

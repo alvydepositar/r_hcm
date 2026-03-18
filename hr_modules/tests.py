@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.test import TestCase
 from django.urls import reverse
@@ -8,7 +9,13 @@ from employee_modules.models import Employee
 from hr_modules.models import Approver
 
 
-class ApproverPageTests(TestCase):
+class HRPortalAuthMixin:
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(get_user_model().objects.get(username="amelia.rivera"))
+
+
+class ApproverPageTests(HRPortalAuthMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.division = Division.objects.create(

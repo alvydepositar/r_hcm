@@ -640,6 +640,231 @@ function getLeaveTypeRecord(value) {
     return leaveTypeState.records.get(String(resolvedValue)) || null;
 }
 
+function normalizeLeaveApplicationDetailSchema(schema = []) {
+    if (!Array.isArray(schema)) {
+        return [];
+    }
+
+    return schema
+        .filter(field => field && typeof field === "object")
+        .map(field => ({
+            key: String(field.key || "").trim(),
+            label: String(field.label || "").trim(),
+            type: String(field.type || "text").trim(),
+            required: Boolean(field.required),
+            help_text: String(field.help_text || "").trim(),
+            placeholder: String(field.placeholder || "").trim(),
+            choices: Array.isArray(field.choices)
+                ? field.choices
+                    .filter(choice => choice && choice.value !== undefined && choice.value !== null)
+                    .map(choice => ({
+                        value: String(choice.value).trim(),
+                        label: String(choice.label ?? choice.value).trim(),
+                    }))
+                : [],
+            show_when: field.show_when && typeof field.show_when === "object"
+                ? {
+                    field: String(field.show_when.field || "").trim(),
+                    equals: String(field.show_when.equals || "").trim(),
+                }
+                : null,
+        }))
+        .filter(field => field.key && field.label);
+}
+
+function isLeaveApplicationDetailFieldVisible(fieldConfig, detailValues = {}) {
+    if (!fieldConfig?.show_when?.field) {
+        return true;
+    }
+
+    return String(detailValues[fieldConfig.show_when.field] || "").trim() === fieldConfig.show_when.equals;
+}
+
+function formatLeaveApplicationDetailSummary(detailValues, schema, {
+    separator = " | ",
+} = {}) {
+    if (!detailValues || typeof detailValues !== "object") {
+        return "";
+    }
+
+    const normalizedSchema = normalizeLeaveApplicationDetailSchema(schema);
+    const choiceLabels = new Map(
+        normalizedSchema.map(field => [
+            field.key,
+            new Map(field.choices.map(choice => [choice.value, choice.label])),
+        ]),
+    );
+
+    const normalizedValues = {};
+    normalizedSchema.forEach(field => {
+        normalizedValues[field.key] = String(detailValues[field.key] || "").trim();
+    });
+
+    return normalizedSchema
+        .filter(field => isLeaveApplicationDetailFieldVisible(field, normalizedValues))
+        .map(field => {
+            const rawValue = normalizedValues[field.key];
+            if (!rawValue) {
+                return "";
+            }
+
+            const displayValue = field.type === "select"
+                ? (choiceLabels.get(field.key)?.get(rawValue) || rawValue)
+                : rawValue;
+
+            return `${field.label}: ${displayValue}`;
+        })
+        .filter(Boolean)
+        .join(separator);
+}
+
+function renderLeaveApplicationDetailFields(container, {
+    schema = [],
+    values = {},
+    idPrefix = "leave-application-detail",
+    emptyMessage = "No additional leave-specific filing details are required.",
+} = {}) {
+    if (!container) {
+        return {
+            schema: [],
+            getValues: () => ({}),
+            refresh: () => {},
+        };
+    }
+
+    const normalizedSchema = normalizeLeaveApplicationDetailSchema(schema);
+    container.innerHTML = "";
+
+    if (!normalizedSchema.length) {
+        container.innerHTML = `
+            <div class="leave-application-detail-fields__empty text-muted small">${emptyMessage}</div>
+        `;
+        return {
+            schema: normalizedSchema,
+            getValues: () => ({}),
+            refresh: () => {},
+        };
+    }
+
+    const row = document.createElement("div");
+    row.className = "row g-3";
+    const fieldNodes = new Map();
+
+    normalizedSchema.forEach((field, index) => {
+        const column = document.createElement("div");
+        column.className = field.type === "textarea" ? "col-12" : "col-md-6";
+        column.dataset.detailFieldKey = field.key;
+
+        const label = document.createElement("label");
+        label.className = "form-label";
+        label.htmlFor = `${idPrefix}-${field.key}`;
+        label.textContent = field.label;
+        column.appendChild(label);
+
+        let control;
+        if (field.type === "textarea") {
+            control = document.createElement("textarea");
+            control.rows = 3;
+        } else if (field.type === "select") {
+            control = document.createElement("select");
+            const placeholderOption = document.createElement("option");
+            placeholderOption.value = "";
+            placeholderOption.textContent = field.placeholder || "Select an option";
+            placeholderOption.disabled = false;
+            placeholderOption.selected = !values[field.key];
+            control.appendChild(placeholderOption);
+
+            field.choices.forEach(choice => {
+                const option = document.createElement("option");
+                option.value = choice.value;
+                option.textContent = choice.label;
+                control.appendChild(option);
+            });
+        } else {
+            control = document.createElement("input");
+            control.type = field.type === "date" ? "date" : "text";
+        }
+
+        control.id = `${idPrefix}-${field.key}`;
+        control.className = "form-control";
+        control.dataset.detailControl = "true";
+        control.dataset.detailKey = field.key;
+        control.dataset.fieldIndex = String(index);
+        if (field.placeholder && field.type !== "select") {
+            control.placeholder = field.placeholder;
+        }
+
+        const initialValue = values[field.key];
+        control.value = initialValue === null || initialValue === undefined ? "" : String(initialValue);
+        column.appendChild(control);
+
+        if (field.help_text) {
+            const help = document.createElement("div");
+            help.className = "form-text";
+            help.textContent = field.help_text;
+            column.appendChild(help);
+        }
+
+        row.appendChild(column);
+        fieldNodes.set(field.key, {
+            field,
+            column,
+            control,
+        });
+    });
+
+    container.appendChild(row);
+
+    const getCurrentValues = () => {
+        const currentValues = {};
+        fieldNodes.forEach(({ control }, key) => {
+            currentValues[key] = String(control.value || "").trim();
+        });
+        return currentValues;
+    };
+
+    const refresh = () => {
+        const currentValues = getCurrentValues();
+
+        fieldNodes.forEach(({ field, column, control }) => {
+            const visible = isLeaveApplicationDetailFieldVisible(field, currentValues);
+            column.classList.toggle("d-none", !visible);
+            control.disabled = !visible;
+
+            if (!visible) {
+                control.required = false;
+                control.value = "";
+                return;
+            }
+
+            control.required = Boolean(field.required);
+        });
+    };
+
+    row.addEventListener("input", refresh);
+    row.addEventListener("change", refresh);
+    refresh();
+
+    return {
+        schema: normalizedSchema,
+        getValues: () => {
+            const detailValues = {};
+            fieldNodes.forEach(({ column, control }, key) => {
+                if (column.classList.contains("d-none") || control.disabled) {
+                    return;
+                }
+
+                const value = String(control.value || "").trim();
+                if (value) {
+                    detailValues[key] = value;
+                }
+            });
+            return detailValues;
+        },
+        refresh,
+    };
+}
+
 function normalizeLookupOptions(options = []) {
     return options
         .filter(option => option && option.value !== undefined && option.value !== null)

@@ -1,3 +1,4 @@
+from django.contrib.auth import views as auth_views
 from django.urls import path, include
 from . import views
 from .views import (
@@ -9,6 +10,7 @@ from .views import (
     EmployeeLeaveCreditLedgerViewSet,
     EmployeeLeaveCreditViewSet,
     LeaveApplicationViewSet,
+    LeaveApplicationApprovalViewSet,
     LeaveTypeViewSet,
     PositionViewSet,
     SalaryGradeViewSet,
@@ -29,10 +31,17 @@ router.register(r'leave-types', LeaveTypeViewSet)
 router.register(r'leave-credits', EmployeeLeaveCreditViewSet)
 router.register(r'leave-credit-ledger', EmployeeLeaveCreditLedgerViewSet)
 router.register(r'leave-applications', LeaveApplicationViewSet)
+router.register(r'leave-approvals', LeaveApplicationApprovalViewSet)
 router.register(r'approvers', ApproverViewSet)
 
 urlpatterns = [
     path('', name='index', view=views.index),
+    path(
+        "login/",
+        auth_views.LoginView.as_view(template_name="registration/login.html", redirect_authenticated_user=True),
+        name="login",
+    ),
+    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
    
     # API URLs
     path('api/', include(router.urls)),

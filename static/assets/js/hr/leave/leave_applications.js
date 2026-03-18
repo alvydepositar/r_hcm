@@ -40,6 +40,11 @@ const leaveApplicationViewFields = [
     },
     { label: "Document Reference", field: "supporting_document_reference" },
     { label: "Reason", field: "reason", fullWidth: true },
+    {
+        label: "Filed Details",
+        field: "application_detail_summary",
+        fullWidth: true,
+    },
     { label: "Document / HR Notes", field: "supporting_document_notes", fullWidth: true },
     { label: "Approved At", field: "approved_at" },
 ];
@@ -158,10 +163,19 @@ function isManualRequestedUnitsLeaveType(leaveTypeRecord) {
 
 function buildLeaveApplicationDisplayRow(rowData) {
     const availableCredit = getLeaveApplicationAvailableBalance(rowData.employee, rowData.leave_type);
+    const leaveTypeRecord = getLeaveTypeRecord(rowData.leave_type);
+    const detailSummary = rowData.application_detail_summary
+        || formatLeaveApplicationDetailSummary(
+            rowData.application_details,
+            rowData.rule_snapshot?.application_detail_schema || leaveTypeRecord?.application_detail_schema || [],
+            { separator: " | " },
+        );
+
     return {
         ...rowData,
         available_balance: rowData.available_balance ?? availableCredit?.current_balance ?? null,
         leave_rule_summary: rowData.entitlement_summary || "",
+        application_detail_summary: detailSummary,
     };
 }
 
@@ -407,6 +421,7 @@ Promise.all([loadEmployees(), loadLeaveTypes(), loadLeaveCreditBalances()])
         const documentReferenceInput = document.getElementById("add-application-document-reference");
         const reasonInput = document.getElementById("add-application-reason");
         const documentNotesInput = document.getElementById("add-application-document-notes");
+        const applicationDetailFieldsContainer = document.getElementById("leave-application-detail-fields");
 
         const ruleSummary = document.getElementById("leave-rule-summary");
         const ruleBucket = document.getElementById("leave-rule-bucket");
@@ -414,6 +429,7 @@ Promise.all([loadEmployees(), loadLeaveTypes(), loadLeaveCreditBalances()])
         const ruleNotice = document.getElementById("leave-rule-notice");
         const ruleMaxDays = document.getElementById("leave-rule-max-days");
         const ruleDocs = document.getElementById("leave-rule-docs");
+        let applicationDetailsController = null;
 
         employeeSelect.dataset.searchCategory = "person";
         initializeSearchableSelects(leaveApplicationModalElement, {
@@ -425,6 +441,17 @@ Promise.all([loadEmployees(), loadLeaveTypes(), loadLeaveCreditBalances()])
             const leaveTypeRecord = getLeaveTypeRecord(leaveTypeSelect.value);
             const availableCredit = getLeaveApplicationAvailableBalance(employeeSelect.value, leaveTypeSelect.value);
             const balanceBucket = resolveLeaveTypeBucket(leaveTypeRecord);
+            const existingApplicationDetails = applicationDetailsController?.getValues?.() || {};
+
+            applicationDetailsController = renderLeaveApplicationDetailFields(
+                applicationDetailFieldsContainer,
+                {
+                    schema: leaveTypeRecord?.application_detail_schema || [],
+                    values: existingApplicationDetails,
+                    idPrefix: "hr-leave-application-detail",
+                    emptyMessage: "No additional leave-specific filing details are required for the selected leave type.",
+                },
+            );
 
             ruleSummary.textContent = leaveTypeRecord?.entitlement_summary || "Select a leave type to view the applicable CSC rule.";
             ruleBucket.textContent = balanceBucket?.bucketName || "Not tracked";
@@ -513,6 +540,7 @@ Promise.all([loadEmployees(), loadLeaveTypes(), loadLeaveCreditBalances()])
                 ),
                 status: statusSelect.value,
                 reason: reasonInput.value.trim(),
+                application_details: applicationDetailsController?.getValues?.() || {},
                 supporting_document_reference: documentReferenceInput.value.trim(),
                 supporting_document_notes: documentNotesInput.value.trim(),
             };

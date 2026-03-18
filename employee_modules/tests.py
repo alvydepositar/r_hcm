@@ -1,11 +1,19 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
 from core.models import Division, Position
+from hr_modules.models import Approver
 from employee_modules.models import Employee, EmployeePersonalDataSheet
 
 
-class EmployeePersonalDataSheetTests(TestCase):
+class HRPortalAuthMixin:
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(get_user_model().objects.get(username="amelia.rivera"))
+
+
+class EmployeePersonalDataSheetTests(HRPortalAuthMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.division = Division.objects.create(
@@ -20,6 +28,26 @@ class EmployeePersonalDataSheetTests(TestCase):
             middle_name="Lopez",
             position=cls.position,
             division=cls.division,
+        )
+        cls.approver_employee = Employee.objects.create(
+            employee_id="EMP-PDS-002",
+            first_name="Leo",
+            last_name="Approver",
+            position=cls.position,
+            division=cls.division,
+        )
+        cls.approver_user = get_user_model().objects.create_user(
+            username="pds.approver",
+            password="Approver@2026",
+        )
+        cls.approver_employee.user = cls.approver_user
+        cls.approver_employee.save(update_fields=["user"])
+        Approver.objects.create(
+            approval_type=Approver.ApprovalType.DIVISION,
+            division_id=cls.division,
+            immediate_supervisor=cls.approver_employee,
+            division_chief=cls.approver_employee,
+            hr_approver=cls.approver_employee,
         )
 
     def test_personal_data_sheet_seed_data_is_loaded(self):
@@ -42,6 +70,38 @@ class EmployeePersonalDataSheetTests(TestCase):
         self.assertContains(response, "Personal Information")
         self.assertContains(response, 'id="pds-print-layout"', html=False)
         self.assertContains(response, "Page 1 of 4")
+
+    def test_employee_leave_portal_page_renders(self):
+        self.client.force_login(get_user_model().objects.get(username="miguel.bautista"))
+        response = self.client.get(reverse("employee_leave_portal"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Employee Leave Portal")
+        self.assertContains(response, "Leave Application")
+        self.assertContains(response, "Assigned Leave Types")
+        self.assertContains(response, "Applicable Policy / Rule")
+        self.assertContains(response, 'id="employee-portal-leave-form"', html=False)
+        self.assertContains(response, 'id="employee-portal-application-details"', html=False)
+        self.assertNotContains(response, 'id="employee-portal-history-body"', html=False)
+
+    def test_employee_leave_history_page_renders(self):
+        self.client.force_login(get_user_model().objects.get(username="miguel.bautista"))
+        response = self.client.get(reverse("employee_leave_history"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Leave History")
+        self.assertContains(response, 'id="employee-history-body"', html=False)
+        self.assertContains(response, 'id="employee-history-filter"', html=False)
+        self.assertContains(response, 'id="employee-history-search"', html=False)
+        self.assertContains(response, 'id="employeeLeaveHistoryModal"', html=False)
+
+    def test_approver_leave_queue_page_renders(self):
+        self.client.force_login(self.approver_user)
+        response = self.client.get(reverse("employee_leave_approval_queue"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Leave Approval Queue")
+        self.assertContains(response, "Assigned Leave Filings")
 
     def test_personal_data_sheet_api_crud(self):
         create_response = self.client.post(
