@@ -6,6 +6,9 @@ from hr_modules.models import Approver
 ROLE_HR = "HR"
 ROLE_EMPLOYEE = "Employee"
 ROLE_APPROVER = "Approver"
+ROLE_RECRUITMENT = "Recruitment"
+ROLE_IT_MANAGER = "IT Manager"
+ROLE_DIVISION_CHIEF = "Division Chief"
 
 PORTAL_HR = "hr"
 PORTAL_EMPLOYEE = "employee"
@@ -30,6 +33,20 @@ def is_employee_user(user):
     return get_user_employee(user) is not None
 
 
+def is_it_manager_user(user):
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and user.groups.filter(name=ROLE_IT_MANAGER).exists()
+    )
+
+
+def is_division_chief_user(user):
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and user.groups.filter(name=ROLE_DIVISION_CHIEF).exists()
+    )
+
+
 def is_approver_employee(employee):
     if employee is None:
         return False
@@ -44,8 +61,21 @@ def is_approver_employee(employee):
     ).exists()
 
 
+def is_division_chief_approver_employee(employee):
+    if employee is None:
+        return False
+
+    return Approver.objects.filter(
+        Q(division_chief=employee) | Q(alt_division_chief=employee)
+    ).exists()
+
+
 def is_approver_user(user):
     return is_approver_employee(get_user_employee(user))
+
+
+def is_division_chief_approver_user(user):
+    return is_division_chief_approver_employee(get_user_employee(user))
 
 
 def can_access_hr_portal(user):
@@ -60,6 +90,34 @@ def can_access_approval_queue(user):
     return is_approver_user(user)
 
 
+def has_recruitment_access(user):
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and (
+            user.is_superuser
+            or user.groups.filter(name__in=[ROLE_RECRUITMENT, ROLE_IT_MANAGER, ROLE_DIVISION_CHIEF]).exists()
+        )
+    )
+
+
+def can_access_recruitment(user):
+    return bool(
+        is_hr_user(user)
+        or can_access_recruitment_requestor(user)
+    )
+
+
+def can_access_recruitment_requestor(user):
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and (
+            user.is_superuser
+            or has_recruitment_access(user)
+            or is_division_chief_approver_user(user)
+        )
+    )
+
+
 def get_role_names(user):
     roles = []
 
@@ -71,6 +129,9 @@ def get_role_names(user):
 
     if is_approver_user(user):
         roles.append(ROLE_APPROVER)
+
+    if has_recruitment_access(user):
+        roles.append(ROLE_RECRUITMENT)
 
     return roles
 

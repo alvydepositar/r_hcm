@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+.env.docker
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+db.sqlite3
+local_dev.sqlite3
+.pytest_cache
+.mypy_cache
+.ruff_cache
+node_modules

@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -671,5 +672,308 @@ class LeaveApplicationApproval(models.Model):
     def __str__(self):
         return (
             f"{self.leave_application} - "
+            f"{self.get_approver_role_display()} - {self.get_status_display()}"
+        )
+
+
+class HiringRequest(models.Model):
+    class RequestorRole(models.TextChoices):
+        IT_MANAGER = "it_manager", "IT Manager"
+        DIVISION_CHIEF = "division_chief", "Division Chief"
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        PENDING_DIVISION_CHIEF = "pending_division_chief", "Pending Division Chief Approval"
+        PENDING_HR = "pending_hr", "Pending HR Approval"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+
+    hiring_request_id = models.AutoField(primary_key=True)
+    request_no = models.CharField(max_length=30, unique=True, null=True, blank=True)
+    requestor_role = models.CharField(max_length=30, choices=RequestorRole.choices)
+    requestor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="recruitment_hiring_requests",
+    )
+    division = models.ForeignKey(
+        Division,
+        on_delete=models.PROTECT,
+        related_name="hiring_requests",
+    )
+    position = models.ForeignKey(
+        Position,
+        on_delete=models.PROTECT,
+        related_name="hiring_requests",
+    )
+    plantilla_item = models.ForeignKey(
+        CSCPlantilla,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="hiring_requests",
+    )
+    headcount_requested = models.PositiveIntegerField(default=1)
+    employment_type = models.CharField(max_length=50)
+    hiring_reason = models.TextField()
+    target_start_date = models.DateField(null=True, blank=True)
+    justification = models.TextField()
+    current_approval_step = models.CharField(max_length=30, blank=True)
+    status = models.CharField(
+        max_length=30,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=100, null=True, blank=True)
+    modified_by = models.CharField(max_length=100, null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created", "-hiring_request_id"]
+
+    def __str__(self):
+        return self.request_no or f"Hiring Request {self.hiring_request_id}"
+
+    def save(self, *args, **kwargs):
+        creating = self.pk is None
+        super().save(*args, **kwargs)
+
+        if creating and not self.request_no:
+            self.request_no = f"HRQ-{self.hiring_request_id:05d}"
+            super().save(update_fields=["request_no"])
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if self.headcount_requested < 1:
+            errors["headcount_requested"] = "Headcount requested must be at least 1."
+
+        if self.plantilla_item_id:
+            if self.plantilla_item.position_id != self.position_id:
+                errors["plantilla_item"] = "The selected plantilla item must match the requested position."
+
+            if self.plantilla_item.division_id != self.division_id:
+                errors["plantilla_item"] = "The selected plantilla item must belong to the selected division."
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class HiringRequestApproval(models.Model):
+    class ApprovalRole(models.TextChoices):
+        DIVISION_CHIEF = "division_chief", "Division Chief"
+        HR_APPROVER = "hr_approver", "HR Approver"
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        SKIPPED = "skipped", "Skipped"
+
+    hiring_request_approval_id = models.AutoField(primary_key=True)
+    hiring_request = models.ForeignKey(
+        HiringRequest,
+        on_delete=models.CASCADE,
+        related_name="approvals",
+    )
+    approver_role = models.CharField(max_length=30, choices=ApprovalRole.choices)
+    approver_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="hiring_request_approvals",
+    )
+    sequence = models.PositiveSmallIntegerField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    decision_notes = models.TextField(blank=True)
+    acted_at = models.DateTimeField(null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["hiring_request__created", "sequence", "hiring_request_approval_id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["hiring_request", "approver_role"],
+                name="unique_hiring_request_approval_role",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.hiring_request} - "
+            f"{self.get_approver_role_display()} - {self.get_status_display()}"
+        )
+
+
+class JobPosting(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PENDING_REQUESTOR_APPROVAL = "pending_requestor_approval", "Pending Requestor Approval"
+        PENDING_HR_PUBLISH_APPROVAL = "pending_hr_publish_approval", "Pending HR Publish Approval"
+        PUBLISHED = "published", "Published"
+        REJECTED = "rejected", "Rejected"
+        UNPUBLISHED = "unpublished", "Unpublished"
+        CLOSED = "closed", "Closed"
+
+    class PortalStatus(models.TextChoices):
+        HIDDEN = "hidden", "Hidden"
+        SCHEDULED = "scheduled", "Scheduled"
+        PUBLISHED = "published", "Published"
+        EXPIRED = "expired", "Expired"
+        CLOSED = "closed", "Closed"
+
+    job_posting_id = models.AutoField(primary_key=True)
+    posting_no = models.CharField(max_length=30, unique=True, null=True, blank=True)
+    hiring_request = models.OneToOneField(
+        HiringRequest,
+        on_delete=models.CASCADE,
+        related_name="job_posting",
+    )
+    requestor_role = models.CharField(max_length=30, choices=HiringRequest.RequestorRole.choices)
+    requestor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_job_postings",
+    )
+    prepared_by_hr_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="prepared_job_postings",
+    )
+    division = models.ForeignKey(
+        Division,
+        on_delete=models.PROTECT,
+        related_name="job_postings",
+    )
+    position = models.ForeignKey(
+        Position,
+        on_delete=models.PROTECT,
+        related_name="job_postings",
+    )
+    plantilla_item = models.ForeignKey(
+        CSCPlantilla,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="job_postings",
+    )
+    job_title = models.CharField(max_length=150)
+    job_summary = models.TextField(blank=True)
+    job_description = models.TextField(blank=True)
+    qualifications = models.TextField(blank=True)
+    employment_type = models.CharField(max_length=50)
+    work_location = models.CharField(max_length=255, blank=True)
+    open_slots = models.PositiveIntegerField(default=1)
+    status = models.CharField(
+        max_length=40,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    portal_status = models.CharField(
+        max_length=20,
+        choices=PortalStatus.choices,
+        default=PortalStatus.HIDDEN,
+    )
+    publish_start = models.DateTimeField(null=True, blank=True)
+    publish_end = models.DateTimeField(null=True, blank=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=100, null=True, blank=True)
+    modified_by = models.CharField(max_length=100, null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created", "-job_posting_id"]
+
+    def __str__(self):
+        return self.posting_no or f"Job Posting {self.job_posting_id}"
+
+    def save(self, *args, **kwargs):
+        creating = self.pk is None
+        super().save(*args, **kwargs)
+
+        if creating and not self.posting_no:
+            self.posting_no = f"JOB-{self.job_posting_id:05d}"
+            super().save(update_fields=["posting_no"])
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if self.open_slots < 1:
+            errors["open_slots"] = "Open slots must be at least 1."
+
+        if self.plantilla_item_id:
+            if self.plantilla_item.position_id != self.position_id:
+                errors["plantilla_item"] = "The selected plantilla item must match the posting position."
+
+            if self.plantilla_item.division_id != self.division_id:
+                errors["plantilla_item"] = "The selected plantilla item must belong to the selected division."
+
+        if self.publish_start and self.publish_end and self.publish_end < self.publish_start:
+            errors["publish_end"] = "Publish end cannot be earlier than publish start."
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class JobPostingApproval(models.Model):
+    class ApprovalRole(models.TextChoices):
+        REQUESTOR = "requestor", "Requestor"
+        HR_PUBLISHER = "hr_publisher", "HR Publisher"
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        SKIPPED = "skipped", "Skipped"
+
+    job_posting_approval_id = models.AutoField(primary_key=True)
+    job_posting = models.ForeignKey(
+        JobPosting,
+        on_delete=models.CASCADE,
+        related_name="approvals",
+    )
+    approver_role = models.CharField(max_length=30, choices=ApprovalRole.choices)
+    approver_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="job_posting_approvals",
+    )
+    sequence = models.PositiveSmallIntegerField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    decision_notes = models.TextField(blank=True)
+    acted_at = models.DateTimeField(null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["job_posting__created", "sequence", "job_posting_approval_id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["job_posting", "approver_role"],
+                name="unique_job_posting_approval_role",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.job_posting} - "
             f"{self.get_approver_role_display()} - {self.get_status_display()}"
         )

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block page_title %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="{% url 'employee_management' %}" class="text-decoration-none text-primary">
+                    <i class="bi bi-arrow-left-short"></i> Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Access Rights</li>
+        </ol>
+    </nav>
+{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card overflow-hidden">
+                <div class="card-body">
+                    <h5 class="card-title mb-9 fs-4 fw-light">Total Accounts</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">{{ account_count }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card overflow-hidden">
+                <div class="card-body">
+                    <h5 class="card-title mb-9 fs-4 fw-light">HR Access</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">{{ hr_account_count }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card overflow-hidden">
+                <div class="card-body">
+                    <h5 class="card-title mb-9 fs-4 fw-light">Employee Linked</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">{{ employee_account_count }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card overflow-hidden">
+                <div class="card-body">
+                    <h5 class="card-title mb-9 fs-4 fw-light">Active Accounts</h5>
+                    <h4 class="fw-semibold mb-2 fs-8">{{ active_account_count }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h5 class="card-title mb-1">Access Rights</h5>
+                    <p class="text-muted mb-0 small">
+                        HR and Recruitment access are assigned explicitly.
+                        Employee portal access comes from the linked employee record.
+                        Approver access is derived automatically from approver routing.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 align-items-center flex-nowrap">
+                    <input type="text" class="table-search form-control" id="table-search" placeholder="Search..." style="min-width: 200px; white-space: nowrap;">
+                    <button id="edit-all-access-rights-btn" type="button" class="btn btn-outline-primary btn-md text-nowrap">
+                        <i class="ti ti-edit"></i> Edit All Rows
+                    </button>
+                    <button id="save-all-access-rights-btn" type="button" class="btn btn-success btn-md text-nowrap d-none">
+                        <i class="ti ti-device-floppy"></i> Save All
+                    </button>
+                    <button id="cancel-all-access-rights-btn" type="button" class="btn btn-secondary btn-md text-nowrap d-none">
+                        <i class="ti ti-x"></i> Cancel All
+                    </button>
+                    <button id="delete-selected-access-rights-btn" type="button" class="btn btn-danger btn-md d-none">
+                        <i class="ti ti-trash"></i> Delete Selected
+                    </button>
+                    <button id="add-access-rights-btn" type="button" class="btn btn-primary btn-md">
+                        <i class="ti ti-plus"></i> Add Account
+                    </button>
+                </div>
+            </div>
+            <div id="access-rights-table"></div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addAccessRightsModal" tabindex="-1" aria-labelledby="addAccessRightsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addAccessRightsModalLabel">Add Account</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="add-access-rights-form">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-access-username">Username</label>
+                                <input id="add-access-username" name="username" type="text" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="add-access-password">Temporary Password</label>
+                                <input id="add-access-password" name="password" type="password" class="form-control" required>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label" for="add-access-employee">Linked Employee</label>
+                                <select
+                                    id="add-access-employee"
+                                    name="employee"
+                                    class="form-select"
+                                    data-search-category="people"
+                                ></select>
+                            </div>
+                            <div class="col-md-6 mb-0">
+                                <div class="form-check form-switch pt-2">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="add-access-hr">
+                                    <label class="form-check-label" for="add-access-hr">Grant HR access</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-0">
+                                <div class="form-check form-switch pt-2">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="add-access-recruitment">
+                                    <label class="form-check-label" for="add-access-recruitment">Grant Recruitment access</label>
+                                </div>
+                            </div>
+                            <div class="col-md-12 mb-0">
+                                <div class="form-check form-switch pt-2">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="add-access-active" checked>
+                                    <label class="form-check-label" for="add-access-active">Account is active</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border rounded p-3 mt-3 text-muted small">
+                            Recruitment access allows the user to open the recruitment requestor portal and create hiring requests.
+                            Division Chief routing is still derived from the linked employee's approver assignment.
+                            <br><br>
+                            Approver queue access is not assigned here. It becomes available automatically when the linked employee is configured as an approver in the approvers maintenance page.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {% load static %}
+    <script src="{% static 'js/hr/security/access_rights.js' %}"></script>
+{% endblock %}

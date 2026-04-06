@@ -1,6 +1,8 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -17,12 +19,28 @@ from core.leave_policy import (
     normalize_leave_application_details,
     normalize_leave_application_detail_schema,
 )
+from core.recruitment_workflow import (
+    approve_hiring_request_approval,
+    approve_job_posting_approval,
+    cancel_hiring_request,
+    reject_hiring_request_approval,
+    reject_job_posting_approval,
+    resolve_hiring_requestor_role,
+    revert_job_posting_to_draft,
+    submit_hiring_request,
+    submit_job_posting_for_requestor_approval,
+    validate_hiring_request_route,
+)
 from employee_modules.models import Employee, EmployeePersonalDataSheet
 from core.models import (
     CSCPlantilla,
     Division,
     EmployeeLeaveCredit,
     EmployeeLeaveCreditLedger,
+    HiringRequest,
+    HiringRequestApproval,
+    JobPosting,
+    JobPostingApproval,
     LeaveApplicationApproval,
     LeaveType,
     LeaveApplication,
@@ -31,8 +49,16 @@ from core.models import (
     SalaryGrade,
     TimeRule,
 )
-from core.rbac import can_access_hr_portal, get_user_employee
+from core.rbac import (
+    ROLE_HR,
+    ROLE_RECRUITMENT,
+    can_access_hr_portal,
+    get_user_employee,
+    has_recruitment_access,
+)
 from hr_modules.models import Approver
+
+User = get_user_model()
 
 class EmployeeSerializer(serializers.ModelSerializer):
     division_name = serializers.CharField(source='division.division_name', read_only=True)
@@ -183,6 +209,230 @@ class EmployeePersonalDataSheetSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(errors)
 
         return attrs
+
+
+class AccessRightsSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    username = serializers.CharField(max_length=150)
+    employee = serializers.PrimaryKeyRelatedField(
+        queryset=Employee.objects.select_related("division", "position").all(),
+        allow_null=True,
+        required=False,
+    )
+    employee_name = serializers.CharField(read_only=True)
+    employee_number = serializers.CharField(read_only=True)
+    division_name = serializers.CharField(read_only=True)
+    position_name = serializers.CharField(read_only=True)
+    has_hr_access = serializers.BooleanField(required=False)
+    has_recruitment_access = serializers.BooleanField(required=False)
+    has_employee_access = serializers.BooleanField(read_only=True)
+    has_approver_access = serializers.BooleanField(read_only=True)
+    role_names = serializers.ListField(child=serializers.CharField(), read_only=True)
+    is_active = serializers.BooleanField(required=False)
+    is_current_user = serializers.BooleanField(read_only=True)
+    last_login = serializers.DateTimeField(read_only=True, allow_null=True)
+    password = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        trim_whitespace=False,
+        style={"input_type": "password"},
+    )
+
+    default_error_messages = {
+        "self_hr_access": "You cannot remove your own HR access.",
+        "self_active": "You cannot deactivate your own account.",
+        "superuser_hr_access": "Superuser accounts must retain HR access.",
+        "employee_in_use": "This employee is already linked to another user account.",
+        "password_required": "A temporary password is required when creating a user account.",
+    }
+
+    def _user_has_hr_access(self, user):
+        return bool(user.is_superuser or any(group.name == ROLE_HR for group in user.groups.all()))
+
+    def _user_has_recruitment_access(self, user):
+        return has_recruitment_access(user)
+
+    def _get_approver_employee_ids(self):
+        cached = self.context.get("_access_rights_approver_employee_ids")
+        if cached is not None:
+            return cached
+
+        approver_ids = set()
+        approver_fields = (
+            "immediate_supervisor_id",
+            "alt_supervisor_id",
+            "division_chief_id",
+            "alt_division_chief_id",
+            "hr_approver_id",
+            "alt_hr_approver_id",
+        )
+
+        for record in Approver.objects.values(*approver_fields):
+            for field in approver_fields:
+                value = record.get(field)
+                if value:
+                    approver_ids.add(value)
+
+        self.context["_access_rights_approver_employee_ids"] = approver_ids
+        return approver_ids
+
+    def _serialize_instance(self, instance):
+        employee = get_user_employee(instance)
+        has_hr_access = self._user_has_hr_access(instance)
+        has_recruitment_access = self._user_has_recruitment_access(instance)
+        approver_employee_ids = self._get_approver_employee_ids()
+        has_approver_access = bool(employee and employee.pk in approver_employee_ids)
+        request = self.context.get("request")
+        role_names = []
+
+        if has_hr_access:
+            role_names.append(ROLE_HR)
+        if employee:
+            role_names.append("Employee")
+        if has_approver_access:
+            role_names.append("Approver")
+        if has_recruitment_access:
+            role_names.append(ROLE_RECRUITMENT)
+
+        return {
+            "id": instance.pk,
+            "username": instance.username,
+            "employee": employee.pk if employee else None,
+            "employee_name": str(employee) if employee else "",
+            "employee_number": employee.employee_id if employee else "",
+            "division_name": employee.division.division_name if employee and employee.division_id else "",
+            "position_name": employee.position.position_name if employee and employee.position_id else "",
+            "has_hr_access": has_hr_access,
+            "has_recruitment_access": has_recruitment_access,
+            "has_employee_access": bool(employee),
+            "has_approver_access": has_approver_access,
+            "role_names": role_names,
+            "is_active": instance.is_active,
+            "is_current_user": bool(request and request.user.is_authenticated and request.user.pk == instance.pk),
+            "last_login": instance.last_login,
+        }
+
+    def to_representation(self, instance):
+        return self._serialize_instance(instance)
+
+    def validate_username(self, value):
+        queryset = User.objects.filter(username=value)
+        instance = getattr(self, "instance", None)
+        if instance is not None:
+            queryset = queryset.exclude(pk=instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+
+        return value
+
+    def validate(self, attrs):
+        instance = getattr(self, "instance", None)
+        request = self.context.get("request")
+        employee = attrs.get("employee", get_user_employee(instance) if instance else None)
+        has_hr_access = attrs.get("has_hr_access", self._user_has_hr_access(instance) if instance else False)
+        is_active = attrs.get("is_active", instance.is_active if instance else True)
+        password = attrs.get("password")
+
+        if instance is None and not password:
+            raise serializers.ValidationError({"password": [self.error_messages["password_required"]]})
+
+        if employee and employee.user_id and (instance is None or employee.user_id != instance.pk):
+            raise serializers.ValidationError({"employee": [self.error_messages["employee_in_use"]]})
+
+        if instance is not None and instance.is_superuser and "has_hr_access" in attrs and not has_hr_access:
+            raise serializers.ValidationError({"has_hr_access": [self.error_messages["superuser_hr_access"]]})
+
+        if request and request.user.is_authenticated and instance is not None and request.user.pk == instance.pk:
+            if "has_hr_access" in attrs and not has_hr_access:
+                raise serializers.ValidationError({"has_hr_access": [self.error_messages["self_hr_access"]]})
+
+            if "is_active" in attrs and not is_active:
+                raise serializers.ValidationError({"is_active": [self.error_messages["self_active"]]})
+
+        return attrs
+
+    def _apply_access_changes(
+        self,
+        user,
+        employee,
+        has_hr_access,
+        has_recruitment_access=False,
+    ):
+        hr_group, _ = Group.objects.get_or_create(name=ROLE_HR)
+        recruitment_group, _ = Group.objects.get_or_create(name=ROLE_RECRUITMENT)
+        legacy_it_group, _ = Group.objects.get_or_create(name="IT Manager")
+        legacy_division_chief_group, _ = Group.objects.get_or_create(name="Division Chief")
+
+        if has_hr_access or user.is_superuser:
+            user.groups.add(hr_group)
+        else:
+            user.groups.remove(hr_group)
+
+        if has_recruitment_access or user.is_superuser:
+            user.groups.add(recruitment_group)
+        else:
+            user.groups.remove(recruitment_group)
+
+        user.groups.remove(legacy_it_group, legacy_division_chief_group)
+
+        current_employee = get_user_employee(user)
+        if current_employee and (employee is None or current_employee.pk != employee.pk):
+            current_employee.user = None
+            current_employee.save(update_fields=["user"])
+
+        if employee and employee.user_id != user.pk:
+            employee.user = user
+            employee.save(update_fields=["user"])
+
+    def create(self, validated_data):
+        employee = validated_data.pop("employee", None)
+        has_hr_access = validated_data.pop("has_hr_access", False)
+        has_recruitment_access = validated_data.pop("has_recruitment_access", False)
+        password = validated_data.pop("password")
+        is_active = validated_data.pop("is_active", True)
+
+        with transaction.atomic():
+            user = User(
+                username=validated_data["username"],
+                is_active=is_active,
+            )
+            user.set_password(password)
+            user.save()
+            self._apply_access_changes(
+                user,
+                employee,
+                has_hr_access,
+                has_recruitment_access,
+            )
+
+        return user
+
+    def update(self, instance, validated_data):
+        employee = validated_data.pop("employee", get_user_employee(instance))
+        has_hr_access = validated_data.pop("has_hr_access", self._user_has_hr_access(instance))
+        has_recruitment_access = validated_data.pop(
+            "has_recruitment_access",
+            self._user_has_recruitment_access(instance),
+        )
+        password = validated_data.pop("password", None)
+        instance.username = validated_data.get("username", instance.username)
+        instance.is_active = validated_data.get("is_active", instance.is_active)
+
+        if password:
+            instance.set_password(password)
+
+        with transaction.atomic():
+            instance.save()
+            self._apply_access_changes(
+                instance,
+                employee,
+                has_hr_access,
+                has_recruitment_access,
+            )
+
+        return instance
 
 class DivisionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -1457,3 +1707,622 @@ class ApproverSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(errors)
 
         return data
+
+
+class HiringRequestSerializer(serializers.ModelSerializer):
+    requestor_username = serializers.CharField(source="requestor_user.username", read_only=True)
+    requestor_name = serializers.SerializerMethodField(read_only=True)
+    requestor_role_label = serializers.CharField(source="get_requestor_role_display", read_only=True)
+    division_name = serializers.CharField(source="division.division_name", read_only=True)
+    position_name = serializers.CharField(source="position.position_name", read_only=True)
+    plantilla_item_number = serializers.CharField(source="plantilla_item.item_number", read_only=True)
+    approval_progress = serializers.SerializerMethodField(read_only=True)
+    current_approval_role_label = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = HiringRequest
+        fields = [
+            "hiring_request_id",
+            "request_no",
+            "requestor_role",
+            "requestor_role_label",
+            "requestor_user",
+            "requestor_username",
+            "requestor_name",
+            "division",
+            "division_name",
+            "position",
+            "position_name",
+            "plantilla_item",
+            "plantilla_item_number",
+            "headcount_requested",
+            "employment_type",
+            "hiring_reason",
+            "target_start_date",
+            "justification",
+            "status",
+            "current_approval_step",
+            "current_approval_role_label",
+            "approval_progress",
+            "created",
+            "modified",
+            "created_by",
+            "modified_by",
+        ]
+        read_only_fields = [
+            "request_no",
+            "requestor_user",
+            "requestor_username",
+            "requestor_name",
+            "requestor_role_label",
+            "current_approval_step",
+            "current_approval_role_label",
+            "approval_progress",
+            "created",
+            "modified",
+        ]
+
+    def get_requestor_name(self, obj):
+        employee = get_user_employee(obj.requestor_user)
+        if employee is None:
+            return obj.requestor_user.username
+        return f"{employee.first_name} {employee.last_name}"
+
+    def get_approval_progress(self, obj):
+        total = obj.approvals.count()
+        if total == 0:
+            return "No approval actions yet"
+        approved = obj.approvals.filter(status=HiringRequestApproval.Status.APPROVED).count()
+        return f"{approved} of {total} approval step(s) completed"
+
+    def get_current_approval_role_label(self, obj):
+        if not obj.current_approval_step:
+            return ""
+        return dict(HiringRequestApproval.ApprovalRole.choices).get(obj.current_approval_step, "")
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        instance = getattr(self, "instance", None)
+        current_status = instance.status if instance is not None else HiringRequest.Status.DRAFT
+
+        requestor_role = attrs.get("requestor_role", getattr(instance, "requestor_role", None))
+        division = attrs.get("division", getattr(instance, "division", None))
+        position = attrs.get("position", getattr(instance, "position", None))
+        plantilla_item = attrs.get("plantilla_item", getattr(instance, "plantilla_item", None))
+        target_status = attrs.get("status", current_status)
+
+        if request is None or not request.user.is_authenticated:
+            raise serializers.ValidationError({
+                "non_field_errors": ["Authentication is required to manage hiring requests."],
+            })
+
+        if instance is not None and "requestor_role" in attrs:
+            raise serializers.ValidationError({
+                "requestor_role": ["Requestor role cannot be changed after the request is created."],
+            })
+
+        if instance is None:
+            try:
+                requestor_role = resolve_hiring_requestor_role(request.user, requestor_role)
+            except ValueError as exc:
+                raise serializers.ValidationError({"requestor_role": [str(exc)]}) from exc
+            attrs["requestor_role"] = requestor_role
+            attrs["requestor_user"] = request.user
+        else:
+            if not can_access_hr_portal(request.user) and instance.requestor_user_id != request.user.pk:
+                raise serializers.ValidationError({
+                    "non_field_errors": ["Only the request owner or HR can update this hiring request."],
+                })
+
+        candidate = instance if instance is not None else HiringRequest(requestor_user=request.user)
+        for key, value in attrs.items():
+            setattr(candidate, key, value)
+
+        try:
+            candidate.full_clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+
+        if target_status == HiringRequest.Status.SUBMITTED:
+            try:
+                validate_hiring_request_route(
+                    user=(instance.requestor_user if instance is not None else request.user),
+                    requestor_role=candidate.requestor_role,
+                    division=division,
+                )
+            except ValueError as exc:
+                raise serializers.ValidationError({"status": [str(exc)]}) from exc
+
+        if target_status == HiringRequest.Status.CANCELLED and current_status == HiringRequest.Status.APPROVED:
+            raise serializers.ValidationError({
+                "status": ["Approved hiring requests cannot be cancelled."],
+            })
+
+        if target_status == HiringRequest.Status.APPROVED and not can_access_hr_portal(request.user):
+            raise serializers.ValidationError({
+                "status": ["Hiring request approvals must be completed through the approval queue."],
+            })
+
+        if position is None:
+            raise serializers.ValidationError({"position": ["This field is required."]})
+
+        if division is None:
+            raise serializers.ValidationError({"division": ["This field is required."]})
+
+        if plantilla_item and (plantilla_item.position_id != position.pk or plantilla_item.division_id != division.pk):
+            raise serializers.ValidationError({
+                "plantilla_item": ["The selected plantilla item must match the request position and division."],
+            })
+
+        return attrs
+
+    def create(self, validated_data):
+        target_status = validated_data.pop("status", HiringRequest.Status.DRAFT)
+        request = self.context.get("request")
+        user = request.user
+        validated_data.setdefault("created_by", user.username)
+        validated_data.setdefault("modified_by", user.username)
+        validated_data["status"] = HiringRequest.Status.DRAFT
+
+        with transaction.atomic():
+            hiring_request = HiringRequest.objects.create(**validated_data)
+            if target_status == HiringRequest.Status.SUBMITTED:
+                hiring_request.modified_by = user.username
+                hiring_request.save(update_fields=["modified_by"])
+                submit_hiring_request(hiring_request)
+
+        return hiring_request
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user
+        target_status = validated_data.pop("status", instance.status)
+
+        editable_statuses = {
+            HiringRequest.Status.DRAFT,
+            HiringRequest.Status.REJECTED,
+            HiringRequest.Status.CANCELLED,
+        }
+        if (
+            not can_access_hr_portal(user)
+            and target_status != HiringRequest.Status.CANCELLED
+            and instance.status not in editable_statuses
+        ):
+            raise serializers.ValidationError({
+                "non_field_errors": ["You can only edit draft or rejected hiring requests."],
+            })
+
+        with transaction.atomic():
+            for key, value in validated_data.items():
+                setattr(instance, key, value)
+            instance.modified_by = user.username
+            instance.save()
+
+            if target_status == HiringRequest.Status.SUBMITTED and instance.status != HiringRequest.Status.SUBMITTED:
+                submit_hiring_request(instance)
+            elif target_status == HiringRequest.Status.CANCELLED and instance.status != HiringRequest.Status.CANCELLED:
+                cancel_hiring_request(instance)
+            elif target_status != instance.status:
+                instance.status = target_status
+                instance.save(update_fields=["status", "modified"])
+
+        instance.refresh_from_db()
+        return instance
+
+
+class HiringRequestApprovalSerializer(serializers.ModelSerializer):
+    approver_username = serializers.CharField(source="approver_user.username", read_only=True)
+    approver_name = serializers.SerializerMethodField(read_only=True)
+    approver_role_label = serializers.CharField(source="get_approver_role_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    request_no = serializers.CharField(source="hiring_request.request_no", read_only=True)
+    request_status = serializers.CharField(source="hiring_request.status", read_only=True)
+    request_status_label = serializers.CharField(source="hiring_request.get_status_display", read_only=True)
+    requestor_username = serializers.CharField(source="hiring_request.requestor_user.username", read_only=True)
+    division = serializers.IntegerField(source="hiring_request.division.pk", read_only=True)
+    division_name = serializers.CharField(source="hiring_request.division.division_name", read_only=True)
+    position = serializers.IntegerField(source="hiring_request.position.pk", read_only=True)
+    position_name = serializers.CharField(source="hiring_request.position.position_name", read_only=True)
+    headcount_requested = serializers.IntegerField(source="hiring_request.headcount_requested", read_only=True)
+    employment_type = serializers.CharField(source="hiring_request.employment_type", read_only=True)
+
+    class Meta:
+        model = HiringRequestApproval
+        fields = [
+            "hiring_request_approval_id",
+            "hiring_request",
+            "request_no",
+            "request_status",
+            "request_status_label",
+            "approver_role",
+            "approver_role_label",
+            "approver_user",
+            "approver_username",
+            "approver_name",
+            "sequence",
+            "status",
+            "status_label",
+            "decision_notes",
+            "acted_at",
+            "requestor_username",
+            "division",
+            "division_name",
+            "position",
+            "position_name",
+            "headcount_requested",
+            "employment_type",
+            "created",
+            "modified",
+        ]
+        read_only_fields = [
+            "hiring_request",
+            "request_no",
+            "request_status",
+            "request_status_label",
+            "approver_role",
+            "approver_role_label",
+            "approver_user",
+            "approver_username",
+            "approver_name",
+            "sequence",
+            "status_label",
+            "acted_at",
+            "requestor_username",
+            "division",
+            "division_name",
+            "position",
+            "position_name",
+            "headcount_requested",
+            "employment_type",
+            "created",
+            "modified",
+        ]
+
+    def get_approver_name(self, obj):
+        employee = get_user_employee(obj.approver_user)
+        if employee is None:
+            return obj.approver_user.username
+        return f"{employee.first_name} {employee.last_name}"
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        target_status = attrs.get("status")
+
+        if target_status not in {
+            HiringRequestApproval.Status.APPROVED,
+            HiringRequestApproval.Status.REJECTED,
+        }:
+            raise serializers.ValidationError({
+                "status": ["Approval decisions must be either approved or rejected."],
+            })
+
+        if self.instance.status != HiringRequestApproval.Status.PENDING:
+            raise serializers.ValidationError({
+                "status": ["Only pending recruitment approvals can be acted on."],
+            })
+
+        if request is None or not request.user.is_authenticated:
+            raise serializers.ValidationError({
+                "non_field_errors": ["Authentication is required to approve hiring requests."],
+            })
+
+        if not can_access_hr_portal(request.user) and request.user.pk != self.instance.approver_user_id:
+            raise serializers.ValidationError({
+                "non_field_errors": ["This hiring request approval is not assigned to your account."],
+            })
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        decision_notes = validated_data.get("decision_notes", "")
+        target_status = validated_data.get("status")
+
+        if target_status == HiringRequestApproval.Status.APPROVED:
+            return approve_hiring_request_approval(instance, decision_notes)
+
+        return reject_hiring_request_approval(instance, decision_notes)
+
+
+class JobPostingSerializer(serializers.ModelSerializer):
+    requestor_username = serializers.CharField(source="requestor_user.username", read_only=True)
+    requestor_name = serializers.SerializerMethodField(read_only=True)
+    requestor_role_label = serializers.CharField(source="get_requestor_role_display", read_only=True)
+    prepared_by_hr_username = serializers.CharField(source="prepared_by_hr_user.username", read_only=True)
+    division_name = serializers.CharField(source="division.division_name", read_only=True)
+    position_name = serializers.CharField(source="position.position_name", read_only=True)
+    plantilla_item_number = serializers.CharField(source="plantilla_item.item_number", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    portal_status_label = serializers.CharField(source="get_portal_status_display", read_only=True)
+    approval_progress = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = JobPosting
+        fields = [
+            "job_posting_id",
+            "posting_no",
+            "hiring_request",
+            "requestor_role",
+            "requestor_role_label",
+            "requestor_user",
+            "requestor_username",
+            "requestor_name",
+            "prepared_by_hr_user",
+            "prepared_by_hr_username",
+            "division",
+            "division_name",
+            "position",
+            "position_name",
+            "plantilla_item",
+            "plantilla_item_number",
+            "job_title",
+            "job_summary",
+            "job_description",
+            "qualifications",
+            "employment_type",
+            "work_location",
+            "open_slots",
+            "status",
+            "status_label",
+            "portal_status",
+            "portal_status_label",
+            "publish_start",
+            "publish_end",
+            "published_at",
+            "approval_progress",
+            "created",
+            "modified",
+            "created_by",
+            "modified_by",
+        ]
+        read_only_fields = [
+            "posting_no",
+            "hiring_request",
+            "requestor_role",
+            "requestor_role_label",
+            "requestor_user",
+            "requestor_username",
+            "requestor_name",
+            "prepared_by_hr_user",
+            "prepared_by_hr_username",
+            "status_label",
+            "portal_status_label",
+            "published_at",
+            "approval_progress",
+            "created",
+            "modified",
+        ]
+
+    EDIT_TRIGGER_FIELDS = {
+        "job_title",
+        "job_summary",
+        "job_description",
+        "qualifications",
+        "employment_type",
+        "work_location",
+        "open_slots",
+        "publish_start",
+        "publish_end",
+        "position",
+        "division",
+        "plantilla_item",
+    }
+    REAPPROVAL_TRIGGER_STATUSES = {
+        JobPosting.Status.PENDING_HR_PUBLISH_APPROVAL,
+        JobPosting.Status.PUBLISHED,
+    }
+
+    def get_requestor_name(self, obj):
+        employee = get_user_employee(obj.requestor_user)
+        if employee is None:
+            return obj.requestor_user.username
+        return f"{employee.first_name} {employee.last_name}"
+
+    def get_approval_progress(self, obj):
+        total = obj.approvals.count()
+        if total == 0:
+            return "No approval actions yet"
+        approved = obj.approvals.filter(status=JobPostingApproval.Status.APPROVED).count()
+        return f"{approved} of {total} approval step(s) completed"
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        instance = getattr(self, "instance", None)
+
+        if request is None or not request.user.is_authenticated:
+            raise serializers.ValidationError({
+                "non_field_errors": ["Authentication is required to manage job postings."],
+            })
+
+        if instance is None:
+            raise serializers.ValidationError({
+                "non_field_errors": ["Job postings are created automatically from approved hiring requests."],
+            })
+
+        candidate = instance
+        for key, value in attrs.items():
+            setattr(candidate, key, value)
+
+        try:
+            candidate.full_clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+
+        explicit_status = attrs.get("status")
+        if explicit_status == JobPosting.Status.PUBLISHED:
+            raise serializers.ValidationError({
+                "status": ["Publishing must be completed through the approval queue."],
+            })
+
+        if explicit_status == JobPosting.Status.PENDING_HR_PUBLISH_APPROVAL:
+            raise serializers.ValidationError({
+                "status": ["HR publish approval is completed through the approval queue."],
+            })
+
+        if (
+            explicit_status == JobPosting.Status.PENDING_REQUESTOR_APPROVAL
+            and not set(attrs.keys()).intersection(self.EDIT_TRIGGER_FIELDS)
+        ):
+            raise serializers.ValidationError({
+                "status": ["Update the posting details before submitting for approval."],
+            })
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user
+        target_status = validated_data.pop("status", instance.status)
+        changed_fields = set(validated_data.keys())
+
+        with transaction.atomic():
+            for key, value in validated_data.items():
+                setattr(instance, key, value)
+            if changed_fields:
+                instance.modified_by = user.username
+                instance.save()
+
+            if (
+                changed_fields.intersection(self.EDIT_TRIGGER_FIELDS)
+                and instance.status in self.REAPPROVAL_TRIGGER_STATUSES
+            ):
+                revert_job_posting_to_draft(instance)
+
+            if target_status == JobPosting.Status.PENDING_REQUESTOR_APPROVAL:
+                submit_job_posting_for_requestor_approval(instance, user)
+            elif target_status == JobPosting.Status.UNPUBLISHED:
+                instance.status = JobPosting.Status.UNPUBLISHED
+                instance.portal_status = JobPosting.PortalStatus.HIDDEN
+                instance.modified_by = user.username
+                instance.save(update_fields=["status", "portal_status", "modified_by", "modified"])
+            elif target_status == JobPosting.Status.CLOSED:
+                instance.status = JobPosting.Status.CLOSED
+                instance.portal_status = JobPosting.PortalStatus.CLOSED
+                instance.modified_by = user.username
+                instance.save(update_fields=["status", "portal_status", "modified_by", "modified"])
+
+        instance.refresh_from_db()
+        return instance
+
+
+class JobPostingApprovalSerializer(serializers.ModelSerializer):
+    approver_username = serializers.CharField(source="approver_user.username", read_only=True)
+    approver_name = serializers.SerializerMethodField(read_only=True)
+    approver_role_label = serializers.CharField(source="get_approver_role_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    posting_no = serializers.CharField(source="job_posting.posting_no", read_only=True)
+    posting_status = serializers.CharField(source="job_posting.status", read_only=True)
+    posting_status_label = serializers.CharField(source="job_posting.get_status_display", read_only=True)
+    job_title = serializers.CharField(source="job_posting.job_title", read_only=True)
+    division_name = serializers.CharField(source="job_posting.division.division_name", read_only=True)
+    position_name = serializers.CharField(source="job_posting.position.position_name", read_only=True)
+
+    class Meta:
+        model = JobPostingApproval
+        fields = [
+            "job_posting_approval_id",
+            "job_posting",
+            "posting_no",
+            "posting_status",
+            "posting_status_label",
+            "approver_role",
+            "approver_role_label",
+            "approver_user",
+            "approver_username",
+            "approver_name",
+            "sequence",
+            "status",
+            "status_label",
+            "decision_notes",
+            "acted_at",
+            "job_title",
+            "division_name",
+            "position_name",
+            "created",
+            "modified",
+        ]
+        read_only_fields = [
+            "job_posting",
+            "posting_no",
+            "posting_status",
+            "posting_status_label",
+            "approver_role",
+            "approver_role_label",
+            "approver_user",
+            "approver_username",
+            "approver_name",
+            "sequence",
+            "status_label",
+            "acted_at",
+            "job_title",
+            "division_name",
+            "position_name",
+            "created",
+            "modified",
+        ]
+
+    def get_approver_name(self, obj):
+        employee = get_user_employee(obj.approver_user)
+        if employee is None:
+            return obj.approver_user.username
+        return f"{employee.first_name} {employee.last_name}"
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        target_status = attrs.get("status")
+
+        if target_status not in {
+            JobPostingApproval.Status.APPROVED,
+            JobPostingApproval.Status.REJECTED,
+        }:
+            raise serializers.ValidationError({
+                "status": ["Job posting decisions must be either approved or rejected."],
+            })
+
+        if self.instance.status != JobPostingApproval.Status.PENDING:
+            raise serializers.ValidationError({
+                "status": ["Only pending job posting approvals can be acted on."],
+            })
+
+        if request is None or not request.user.is_authenticated:
+            raise serializers.ValidationError({
+                "non_field_errors": ["Authentication is required to approve job postings."],
+            })
+
+        if not can_access_hr_portal(request.user) and request.user.pk != self.instance.approver_user_id:
+            raise serializers.ValidationError({
+                "non_field_errors": ["This job posting approval is not assigned to your account."],
+            })
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        decision_notes = validated_data.get("decision_notes", "")
+        target_status = validated_data.get("status")
+
+        if target_status == JobPostingApproval.Status.APPROVED:
+            return approve_job_posting_approval(instance, decision_notes)
+
+        return reject_job_posting_approval(instance, decision_notes)
+
+
+class PublicJobPostingSerializer(serializers.ModelSerializer):
+    division_name = serializers.CharField(source="division.division_name", read_only=True)
+    position_name = serializers.CharField(source="position.position_name", read_only=True)
+
+    class Meta:
+        model = JobPosting
+        fields = [
+            "job_posting_id",
+            "posting_no",
+            "job_title",
+            "job_summary",
+            "job_description",
+            "qualifications",
+            "employment_type",
+            "work_location",
+            "open_slots",
+            "division_name",
+            "position_name",
+            "publish_start",
+            "publish_end",
+        ]

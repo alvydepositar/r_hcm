@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -14,12 +15,17 @@ from core.models import (
     Division,
     EmployeeLeaveCredit,
     EmployeeLeaveCreditLedger,
+    HiringRequest,
+    HiringRequestApproval,
+    JobPosting,
+    JobPostingApproval,
     LeaveApplication,
     LeaveApplicationApproval,
     LeaveType,
     Position,
     SalaryGrade,
 )
+from core.rbac import ROLE_HR, ROLE_RECRUITMENT
 
 
 class HRPortalAuthMixin:
@@ -1009,3 +1015,287 @@ class RBACAndApprovalWorkflowTests(TestCase):
         self.assertEqual(first_step.status, LeaveApplicationApproval.Status.APPROVED)
         self.assertEqual(next_step.status, LeaveApplicationApproval.Status.PENDING)
         self.assertEqual(application.status, LeaveApplication.Status.SUBMITTED)
+
+
+class RecruitmentWorkflowTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+
+        cls.hr_group, _ = Group.objects.get_or_create(name=ROLE_HR)
+        cls.recruitment_group, _ = Group.objects.get_or_create(name=ROLE_RECRUITMENT)
+
+        cls.division = Division.objects.create(
+            division_name="Recruitment Division",
+            division_abbreviation="REC",
+        )
+        cls.position = Position.objects.create(position_name="Recruitment Analyst")
+        cls.supervisor_employee = Employee.objects.create(
+            employee_id="REC-SUP-001",
+            first_name="Sam",
+            last_name="Supervisor",
+            position=cls.position,
+            division=cls.division,
+        )
+        cls.it_employee = Employee.objects.create(
+            employee_id="REC-IT-001",
+            first_name="Iris",
+            last_name="Manager",
+            position=cls.position,
+            division=cls.division,
+        )
+        cls.division_chief_employee = Employee.objects.create(
+            employee_id="REC-DC-001",
+            first_name="Diana",
+            last_name="Chief",
+            position=cls.position,
+            division=cls.division,
+        )
+        cls.hr_employee = Employee.objects.create(
+            employee_id="REC-HR-001",
+            first_name="Harper",
+            last_name="Recruiter",
+            position=cls.position,
+            division=cls.division,
+        )
+
+        cls.it_user = user_model.objects.create_user(username="recruit.it", password="Recruitment@2026")
+        cls.division_chief_user = user_model.objects.create_user(
+            username="recruit.dc",
+            password="Recruitment@2026",
+        )
+        cls.hr_user = user_model.objects.create_user(username="recruit.hr", password="Recruitment@2026")
+
+        cls.it_user.groups.add(cls.recruitment_group)
+        cls.division_chief_user.groups.add(cls.recruitment_group)
+        cls.hr_user.groups.add(cls.hr_group)
+
+        cls.it_employee.user = cls.it_user
+        cls.it_employee.save(update_fields=["user"])
+        cls.division_chief_employee.user = cls.division_chief_user
+        cls.division_chief_employee.save(update_fields=["user"])
+        cls.hr_employee.user = cls.hr_user
+        cls.hr_employee.save(update_fields=["user"])
+
+        Approver.objects.create(
+            approval_type=Approver.ApprovalType.DIVISION,
+            division_id=cls.division,
+            immediate_supervisor=cls.supervisor_employee,
+            division_chief=cls.division_chief_employee,
+            hr_approver=cls.hr_employee,
+        )
+
+    def _submit_hiring_request(self, user, role):
+        self.client.force_login(user)
+        response = self.client.post(
+            "/api/hiring-requests/",
+            data={
+                "requestor_role": role,
+                "division": self.division.pk,
+                "position": self.position.pk,
+                "headcount_requested": 2,
+                "employment_type": "full_time",
+                "hiring_reason": "Additional team capacity",
+                "target_start_date": (timezone.localdate() + timedelta(days=30)).isoformat(),
+                "justification": "Expansion of approved workload.",
+                "status": "submitted",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        return response
+
+    def test_it_initiated_hiring_request_routes_to_division_chief_then_hr_and_creates_job_posting(self):
+        create_response = self._submit_hiring_request(
+            self.it_user,
+            HiringRequest.RequestorRole.IT_MANAGER,
+        )
+
+        hiring_request_id = create_response.json()["hiring_request_id"]
+        hiring_request = HiringRequest.objects.get(pk=hiring_request_id)
+        approvals = list(hiring_request.approvals.order_by("sequence"))
+
+        self.assertEqual(hiring_request.status, HiringRequest.Status.PENDING_DIVISION_CHIEF)
+        self.assertEqual(len(approvals), 2)
+        self.assertEqual(approvals[0].approver_role, HiringRequestApproval.ApprovalRole.DIVISION_CHIEF)
+        self.assertEqual(approvals[0].approver_user, self.division_chief_user)
+        self.assertEqual(approvals[0].status, HiringRequestApproval.Status.PENDING)
+        self.assertEqual(approvals[1].approver_role, HiringRequestApproval.ApprovalRole.HR_APPROVER)
+        self.assertEqual(approvals[1].status, HiringRequestApproval.Status.QUEUED)
+
+        self.client.force_login(self.division_chief_user)
+        dc_approval_response = self.client.patch(
+            f"/api/hiring-request-approvals/{approvals[0].hiring_request_approval_id}/",
+            data={"status": "approved", "decision_notes": "Division need confirmed."},
+            content_type="application/json",
+        )
+        self.assertEqual(dc_approval_response.status_code, 200)
+
+        hiring_request.refresh_from_db()
+        approvals[1].refresh_from_db()
+        self.assertEqual(hiring_request.status, HiringRequest.Status.PENDING_HR)
+        self.assertEqual(approvals[1].status, HiringRequestApproval.Status.PENDING)
+
+        self.client.force_login(self.hr_user)
+        hr_approval_response = self.client.patch(
+            f"/api/hiring-request-approvals/{approvals[1].hiring_request_approval_id}/",
+            data={"status": "approved", "decision_notes": "HR approved the request."},
+            content_type="application/json",
+        )
+        self.assertEqual(hr_approval_response.status_code, 200)
+
+        hiring_request.refresh_from_db()
+        self.assertEqual(hiring_request.status, HiringRequest.Status.APPROVED)
+        self.assertTrue(hasattr(hiring_request, "job_posting"))
+        self.assertEqual(hiring_request.job_posting.status, JobPosting.Status.DRAFT)
+        self.assertEqual(hiring_request.job_posting.requestor_user, self.it_user)
+
+    def test_division_chief_initiated_hiring_request_routes_directly_to_hr(self):
+        create_response = self._submit_hiring_request(
+            self.division_chief_user,
+            HiringRequest.RequestorRole.DIVISION_CHIEF,
+        )
+
+        hiring_request = HiringRequest.objects.get(pk=create_response.json()["hiring_request_id"])
+        approvals = list(hiring_request.approvals.order_by("sequence"))
+
+        self.assertEqual(hiring_request.status, HiringRequest.Status.PENDING_HR)
+        self.assertEqual(len(approvals), 1)
+        self.assertEqual(approvals[0].approver_role, HiringRequestApproval.ApprovalRole.HR_APPROVER)
+        self.assertEqual(approvals[0].approver_user, self.hr_user)
+        self.assertEqual(approvals[0].status, HiringRequestApproval.Status.PENDING)
+
+    def test_hr_can_submit_job_posting_then_requestor_and_hr_publish_it(self):
+        create_response = self._submit_hiring_request(
+            self.it_user,
+            HiringRequest.RequestorRole.IT_MANAGER,
+        )
+        hiring_request = HiringRequest.objects.get(pk=create_response.json()["hiring_request_id"])
+        approvals = list(hiring_request.approvals.order_by("sequence"))
+
+        self.client.force_login(self.division_chief_user)
+        self.client.patch(
+            f"/api/hiring-request-approvals/{approvals[0].hiring_request_approval_id}/",
+            data={"status": "approved", "decision_notes": "Confirmed."},
+            content_type="application/json",
+        )
+        self.client.force_login(self.hr_user)
+        self.client.patch(
+            f"/api/hiring-request-approvals/{approvals[1].hiring_request_approval_id}/",
+            data={"status": "approved", "decision_notes": "Approved."},
+            content_type="application/json",
+        )
+
+        hiring_request.refresh_from_db()
+        job_posting = hiring_request.job_posting
+
+        submit_response = self.client.patch(
+            f"/api/job-postings/{job_posting.job_posting_id}/",
+            data={
+                "job_title": "Recruitment Analyst I",
+                "job_summary": "Support the recruitment pipeline.",
+                "job_description": "Manage job posting intake and applicant coordination.",
+                "qualifications": "Bachelor's degree and relevant experience.",
+                "work_location": "Quezon City",
+                "status": "pending_requestor_approval",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(submit_response.status_code, 200)
+
+        job_posting.refresh_from_db()
+        self.assertEqual(job_posting.status, JobPosting.Status.PENDING_REQUESTOR_APPROVAL)
+        posting_approvals = list(job_posting.approvals.order_by("sequence"))
+        self.assertEqual(len(posting_approvals), 2)
+        self.assertEqual(posting_approvals[0].approver_user, self.it_user)
+        self.assertEqual(posting_approvals[0].status, JobPostingApproval.Status.PENDING)
+
+        self.client.force_login(self.it_user)
+        requestor_approval_response = self.client.patch(
+            f"/api/job-posting-approvals/{posting_approvals[0].job_posting_approval_id}/",
+            data={"status": "approved", "decision_notes": "Approve posting content."},
+            content_type="application/json",
+        )
+        self.assertEqual(requestor_approval_response.status_code, 200)
+
+        job_posting.refresh_from_db()
+        posting_approvals[1].refresh_from_db()
+        self.assertEqual(job_posting.status, JobPosting.Status.PENDING_HR_PUBLISH_APPROVAL)
+        self.assertEqual(posting_approvals[1].status, JobPostingApproval.Status.PENDING)
+
+        self.client.force_login(self.hr_user)
+        publish_response = self.client.patch(
+            f"/api/job-posting-approvals/{posting_approvals[1].job_posting_approval_id}/",
+            data={"status": "approved", "decision_notes": "Publish to portal."},
+            content_type="application/json",
+        )
+        self.assertEqual(publish_response.status_code, 200)
+
+        job_posting.refresh_from_db()
+        self.assertEqual(job_posting.status, JobPosting.Status.PUBLISHED)
+        self.assertEqual(job_posting.portal_status, JobPosting.PortalStatus.PUBLISHED)
+        self.assertIsNotNone(job_posting.published_at)
+
+        self.client.logout()
+        public_response = self.client.get("/api/public-job-postings/")
+        self.assertEqual(public_response.status_code, 200)
+        self.assertEqual(len(public_response.json()), 1)
+        self.assertEqual(public_response.json()[0]["job_title"], "Recruitment Analyst I")
+
+    def test_editing_after_requestor_approval_reverts_job_posting_to_draft(self):
+        create_response = self._submit_hiring_request(
+            self.it_user,
+            HiringRequest.RequestorRole.IT_MANAGER,
+        )
+        hiring_request = HiringRequest.objects.get(pk=create_response.json()["hiring_request_id"])
+        approvals = list(hiring_request.approvals.order_by("sequence"))
+
+        self.client.force_login(self.division_chief_user)
+        self.client.patch(
+            f"/api/hiring-request-approvals/{approvals[0].hiring_request_approval_id}/",
+            data={"status": "approved", "decision_notes": "Confirmed."},
+            content_type="application/json",
+        )
+        self.client.force_login(self.hr_user)
+        self.client.patch(
+            f"/api/hiring-request-approvals/{approvals[1].hiring_request_approval_id}/",
+            data={"status": "approved", "decision_notes": "Approved."},
+            content_type="application/json",
+        )
+
+        job_posting = HiringRequest.objects.get(pk=hiring_request.pk).job_posting
+
+        self.client.patch(
+            f"/api/job-postings/{job_posting.job_posting_id}/",
+            data={
+                "job_title": "Recruitment Analyst I",
+                "job_description": "Initial description.",
+                "qualifications": "Initial qualification.",
+                "status": "pending_requestor_approval",
+            },
+            content_type="application/json",
+        )
+        posting_approvals = list(JobPostingApproval.objects.filter(job_posting=job_posting).order_by("sequence"))
+
+        self.client.force_login(self.it_user)
+        self.client.patch(
+            f"/api/job-posting-approvals/{posting_approvals[0].job_posting_approval_id}/",
+            data={"status": "approved", "decision_notes": "Looks good."},
+            content_type="application/json",
+        )
+
+        self.client.force_login(self.hr_user)
+        revise_response = self.client.patch(
+            f"/api/job-postings/{job_posting.job_posting_id}/",
+            data={"job_description": "Updated after requestor approval."},
+            content_type="application/json",
+        )
+        self.assertEqual(revise_response.status_code, 200)
+
+        job_posting.refresh_from_db()
+        posting_approvals[0].refresh_from_db()
+        posting_approvals[1].refresh_from_db()
+
+        self.assertEqual(job_posting.status, JobPosting.Status.DRAFT)
+        self.assertEqual(posting_approvals[0].status, JobPostingApproval.Status.SKIPPED)
+        self.assertEqual(posting_approvals[1].status, JobPostingApproval.Status.SKIPPED)

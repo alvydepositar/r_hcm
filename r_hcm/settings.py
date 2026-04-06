@@ -10,22 +10,89 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _load_env_file(env_path: Path) -> None:
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        if value and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+
+        os.environ.setdefault(key, value)
+
+
+def _get_bool_env(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _get_list_env(name: str) -> list[str]:
+    value = os.getenv(name, "")
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _get_database_settings() -> dict[str, dict[str, object]]:
+    engine = os.getenv("DJANGO_DB_ENGINE", "django.db.backends.sqlite3")
+
+    if engine == "django.db.backends.sqlite3":
+        db_name = os.getenv("DJANGO_DB_NAME", "db.sqlite3")
+        db_path = Path(db_name)
+        if not db_path.is_absolute():
+            db_path = BASE_DIR / db_path
+
+        return {
+            "default": {
+                "ENGINE": engine,
+                "NAME": db_path,
+            }
+        }
+
+    return {
+        "default": {
+            "ENGINE": engine,
+            "NAME": os.getenv("DJANGO_DB_NAME", ""),
+            "USER": os.getenv("DJANGO_DB_USER", ""),
+            "PASSWORD": os.getenv("DJANGO_DB_PASSWORD", ""),
+            "HOST": os.getenv("DJANGO_DB_HOST", ""),
+            "PORT": os.getenv("DJANGO_DB_PORT", ""),
+        }
+    }
+
+
+_load_env_file(BASE_DIR / ".env")
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-tp0g5t7lt!_rc=s#6^u0gah1a0ji-&9mk5ittl(=@@d&tvztuf'
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-tp0g5t7lt!_rc=s#6^u0gah1a0ji-&9mk5ittl(=@@d&tvztuf",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _get_bool_env("DJANGO_DEBUG", True)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = _get_list_env("DJANGO_ALLOWED_HOSTS")
 
 
 # Application definition
@@ -81,12 +148,7 @@ WSGI_APPLICATION = 'r_hcm.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+DATABASES = _get_database_settings()
 
 
 # Password validation
@@ -113,7 +175,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = os.getenv("DJANGO_TIME_ZONE", "UTC")
 
 USE_I18N = True
 

@@ -105,13 +105,23 @@
                         </a>
                     </div>
                     <div class="col-4">
-                        <a href="#" class="text-decoration-none">
+                        <a href="{% url 'access_rights' %}" class="text-decoration-none">
                             <div class="tile text-center p-3 border rounded">
                                 <i class="bi bi-shield-lock fs-2 mb-2"></i>
                                 <div>Manage Access Rights</div>
                             </div>
                         </a>
                     </div>
+                    {% if can_access_recruitment %}
+                    <div class="col-4">
+                        <a href="{% url 'recruitment_management' %}" class="text-decoration-none">
+                            <div class="tile text-center p-3 border rounded">
+                                <i class="bi bi-briefcase fs-2 mb-2"></i>
+                                <div>Recruitment Workspace</div>
+                            </div>
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

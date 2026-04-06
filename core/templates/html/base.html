@@ -56,7 +56,7 @@
             <div id="hr-admin-nav" {% if portal_mode == 'employee' %}style="display: none;"{% endif %}>
               <li class="nav-small-cap">
                 <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-                <span class="hide-menu">Management</span>
+                <span class="hide-menu">HCM Management</span>
               </li>
               <!-- Employee Management -->
               <li class="sidebar-item">
@@ -84,6 +84,33 @@
                 <a class="sidebar-link" href="{% url 'cc_management' %}" aria-expanded="false">
                   <i class="ti ti-clock"></i>
                   <span class="hide-menu">Time Correction</span>
+                </a>
+              </li>
+            </div>
+            {% endif %}
+            {% if can_access_recruitment %}
+            <li class="nav-small-cap mt-4">
+              <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
+              <span class="hide-menu">Recruitment</span>
+            </li>
+              <li class="sidebar-item">
+                <a class="sidebar-link" href="{% url 'recruitment_management' %}" aria-expanded="false">
+                  <i class="ti ti-briefcase"></i>
+                  <span class="hide-menu">Recruitment Portal</span>
+                </a>
+              </li>
+              {% endif %}
+
+            {% if can_access_recruitment and not can_access_hr_portal %}
+            <div id="recruitment-nav" {% if portal_mode == 'employee' %}style="display: none;"{% endif %}>
+              <li class="nav-small-cap">
+                <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
+                <span class="hide-menu">Recruitment</span>
+              </li>
+              <li class="sidebar-item">
+                <a class="sidebar-link" href="{% url 'recruitment_requestor_portal' %}" aria-expanded="false">
+                  <i class="ti ti-briefcase"></i>
+                  <span class="hide-menu">Recruitment Portal</span>
                 </a>
               </li>
             </div>
@@ -236,6 +263,19 @@
                   </li>
                 </ul>
               </li>
+
+              {% if can_access_recruitment_requestor %}
+              <li class="nav-small-cap">
+                <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
+                <span class="hide-menu">Recruitment</span>
+              </li>
+              <li class="sidebar-item">
+                <a class="sidebar-link" href="{% url 'recruitment_requestor_portal' %}" aria-expanded="false">
+                  <i class="ti ti-briefcase"></i>
+                  <span class="hide-menu">Recruitment Portal</span>
+                </a>
+              </li>
+              {% endif %}
 
               <li class="nav-small-cap">
                 <i class="ti ti-dots nav-small-cap-icon fs-4"></i>

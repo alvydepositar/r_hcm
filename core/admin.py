@@ -5,6 +5,10 @@ from .models import (
     Division,
     EmployeeLeaveCredit,
     EmployeeLeaveCreditLedger,
+    HiringRequest,
+    HiringRequestApproval,
+    JobPosting,
+    JobPostingApproval,
     LeaveApplication,
     LeaveApplicationApproval,
     LeaveType,
@@ -104,6 +108,38 @@ class LeaveApplicationApprovalInline(admin.TabularInline):
     )
 
 
+class HiringRequestApprovalInline(admin.TabularInline):
+    model = HiringRequestApproval
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        "approver_user",
+        "approver_role",
+        "sequence",
+        "status",
+        "decision_notes",
+        "acted_at",
+        "created",
+        "modified",
+    )
+
+
+class JobPostingApprovalInline(admin.TabularInline):
+    model = JobPostingApproval
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        "approver_user",
+        "approver_role",
+        "sequence",
+        "status",
+        "decision_notes",
+        "acted_at",
+        "created",
+        "modified",
+    )
+
+
 @admin.register(EmployeeLeaveCredit)
 class EmployeeLeaveCreditAdmin(admin.ModelAdmin):
     list_display = (
@@ -167,4 +203,87 @@ class LeaveApplicationApprovalAdmin(admin.ModelAdmin):
         "approver_employee__employee_id",
         "approver_employee__first_name",
         "approver_employee__last_name",
+    )
+
+
+@admin.register(HiringRequest)
+class HiringRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "hiring_request_id",
+        "request_no",
+        "requestor_user",
+        "requestor_role",
+        "division",
+        "position",
+        "headcount_requested",
+        "status",
+        "current_approval_step",
+    )
+    list_filter = ("status", "requestor_role", "division")
+    search_fields = (
+        "request_no",
+        "requestor_user__username",
+        "division__division_name",
+        "position__position_name",
+    )
+    inlines = (HiringRequestApprovalInline,)
+
+
+@admin.register(HiringRequestApproval)
+class HiringRequestApprovalAdmin(admin.ModelAdmin):
+    list_display = (
+        "hiring_request_approval_id",
+        "hiring_request",
+        "approver_user",
+        "approver_role",
+        "sequence",
+        "status",
+        "acted_at",
+    )
+    list_filter = ("status", "approver_role")
+    search_fields = (
+        "hiring_request__request_no",
+        "approver_user__username",
+    )
+
+
+@admin.register(JobPosting)
+class JobPostingAdmin(admin.ModelAdmin):
+    list_display = (
+        "job_posting_id",
+        "posting_no",
+        "job_title",
+        "requestor_user",
+        "division",
+        "position",
+        "status",
+        "portal_status",
+    )
+    list_filter = ("status", "portal_status", "division")
+    search_fields = (
+        "posting_no",
+        "job_title",
+        "requestor_user__username",
+        "division__division_name",
+        "position__position_name",
+    )
+    inlines = (JobPostingApprovalInline,)
+
+
+@admin.register(JobPostingApproval)
+class JobPostingApprovalAdmin(admin.ModelAdmin):
+    list_display = (
+        "job_posting_approval_id",
+        "job_posting",
+        "approver_user",
+        "approver_role",
+        "sequence",
+        "status",
+        "acted_at",
+    )
+    list_filter = ("status", "approver_role")
+    search_fields = (
+        "job_posting__posting_no",
+        "job_posting__job_title",
+        "approver_user__username",
     )

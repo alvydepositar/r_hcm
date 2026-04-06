@@ -1,11 +1,13 @@
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import render
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
 from core.models import (
@@ -13,6 +15,10 @@ from core.models import (
     Division,
     EmployeeLeaveCredit,
     EmployeeLeaveCreditLedger,
+    HiringRequest,
+    HiringRequestApproval,
+    JobPosting,
+    JobPostingApproval,
     LeaveApplication,
     LeaveApplicationApproval,
     LeaveType,
@@ -21,24 +27,32 @@ from core.models import (
     TimeRule,
 )
 from core.permissions import IsAuthenticatedAndHR, IsAuthenticatedAndHROrReadOnly
-from core.rbac import can_access_hr_portal, get_user_employee
+from core.rbac import can_access_hr_portal, get_user_employee, has_recruitment_access
 from core.serializers import (
     ApproverSerializer,
+    AccessRightsSerializer,
     CSCPlantillaSerializer,
     DivisionSerializer,
     EmployeeSerializer,
     EmployeePersonalDataSheetSerializer,
     EmployeeLeaveCreditLedgerSerializer,
     EmployeeLeaveCreditSerializer,
+    HiringRequestApprovalSerializer,
+    HiringRequestSerializer,
+    JobPostingApprovalSerializer,
+    JobPostingSerializer,
     LeaveApplicationSerializer,
     LeaveApplicationApprovalSerializer,
     LeaveTypeSerializer,
     PositionSerializer,
+    PublicJobPostingSerializer,
     SalaryGradeSerializer,
     TimeRuleSerializer,
 )
 from employee_modules.models import Employee, EmployeePersonalDataSheet
 from hr_modules.models import Approver
+
+User = get_user_model()
 
 # Create your views here.
 @login_required
@@ -50,6 +64,164 @@ class EmployeeViewSet(ModelViewSet):
     queryset = Employee.objects.select_related('position', 'division').all()
     serializer_class = EmployeeSerializer
     permission_classes = [IsAuthenticatedAndHR]
+
+
+class AccessRightsViewSet(ModelViewSet):
+    queryset = User.objects.select_related(
+        "employee_profile",
+        "employee_profile__position",
+        "employee_profile__division",
+    ).prefetch_related("groups").order_by("username")
+    serializer_class = AccessRightsSerializer
+    permission_classes = [IsAuthenticatedAndHR]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def perform_destroy(self, instance):
+        if instance.pk == self.request.user.pk:
+            raise PermissionDenied("You cannot delete your own account.")
+
+        if instance.is_superuser:
+            raise PermissionDenied("Superuser accounts cannot be deleted from this page.")
+
+        instance.delete()
+
+
+class HiringRequestViewSet(ModelViewSet):
+    queryset = HiringRequest.objects.select_related(
+        "requestor_user",
+        "division",
+        "position",
+        "plantilla_item",
+    ).all()
+    serializer_class = HiringRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if can_access_hr_portal(self.request.user):
+            return queryset
+
+        return queryset.filter(
+            Q(requestor_user=self.request.user) | Q(approvals__approver_user=self.request.user)
+        ).distinct()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if not has_recruitment_access(user):
+            raise PermissionDenied("Only recruitment-enabled users can create hiring requests.")
+
+        serializer.save()
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        if not can_access_hr_portal(self.request.user) and instance.requestor_user_id != self.request.user.pk:
+            raise PermissionDenied("Only the request owner or HR can update this hiring request.")
+
+        serializer.save()
+
+
+class HiringRequestApprovalViewSet(ModelViewSet):
+    queryset = HiringRequestApproval.objects.select_related(
+        "hiring_request",
+        "hiring_request__division",
+        "hiring_request__position",
+        "hiring_request__requestor_user",
+        "approver_user",
+    ).all()
+    serializer_class = HiringRequestApprovalSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status = self.request.query_params.get("status")
+
+        if not can_access_hr_portal(self.request.user):
+            queryset = queryset.filter(approver_user=self.request.user)
+
+        if status:
+            queryset = queryset.filter(status=status)
+
+        return queryset
+
+
+class JobPostingViewSet(ModelViewSet):
+    queryset = JobPosting.objects.select_related(
+        "hiring_request",
+        "division",
+        "position",
+        "plantilla_item",
+        "requestor_user",
+        "prepared_by_hr_user",
+    ).all()
+    serializer_class = JobPostingSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status = self.request.query_params.get("status")
+        portal_status = self.request.query_params.get("portal_status")
+
+        if not can_access_hr_portal(self.request.user):
+            queryset = queryset.filter(
+                Q(requestor_user=self.request.user) | Q(approvals__approver_user=self.request.user)
+            ).distinct()
+
+        if status:
+            queryset = queryset.filter(status=status)
+
+        if portal_status:
+            queryset = queryset.filter(portal_status=portal_status)
+
+        return queryset
+
+    def perform_update(self, serializer):
+        if not can_access_hr_portal(self.request.user):
+            raise PermissionDenied("Only HR users can edit job postings.")
+
+        serializer.save()
+
+
+class JobPostingApprovalViewSet(ModelViewSet):
+    queryset = JobPostingApproval.objects.select_related(
+        "job_posting",
+        "job_posting__division",
+        "job_posting__position",
+        "approver_user",
+    ).all()
+    serializer_class = JobPostingApprovalSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status = self.request.query_params.get("status")
+
+        if not can_access_hr_portal(self.request.user):
+            queryset = queryset.filter(approver_user=self.request.user)
+
+        if status:
+            queryset = queryset.filter(status=status)
+
+        return queryset
+
+
+class PublicJobPostingViewSet(ModelViewSet):
+    queryset = JobPosting.objects.select_related("division", "position").all()
+    serializer_class = PublicJobPostingSerializer
+    permission_classes = [AllowAny]
+    http_method_names = ["get", "head", "options"]
+
+    def get_queryset(self):
+        now = timezone.now()
+        return (
+            super()
+            .get_queryset()
+            .filter(status=JobPosting.Status.PUBLISHED, portal_status=JobPosting.PortalStatus.PUBLISHED)
+            .filter(Q(publish_start__isnull=True) | Q(publish_start__lte=now))
+            .filter(Q(publish_end__isnull=True) | Q(publish_end__gte=now))
+        )
 
 
 class EmployeePersonalDataSheetViewSet(ModelViewSet):
