@@ -982,6 +982,40 @@ function requestorBindFormEvents() {
     });
 }
 
+function requestorActivateTabFromHash() {
+    const hash = window.location.hash;
+    if (!hash) {
+        return;
+    }
+
+    const tabTrigger = document.querySelector(
+        `#requestorRecruitmentTabs [data-bs-toggle="tab"][data-bs-target="${hash}"]`
+    );
+    if (!tabTrigger) {
+        return;
+    }
+
+    bootstrap.Tab.getOrCreateInstance(tabTrigger).show();
+}
+
+function requestorBindTabHashSync() {
+    const tabTriggers = document.querySelectorAll(
+        "#requestorRecruitmentTabs [data-bs-toggle='tab']"
+    );
+    tabTriggers.forEach(tabTrigger => {
+        tabTrigger.addEventListener("shown.bs.tab", event => {
+            const targetHash = event.target.getAttribute("data-bs-target");
+            if (!targetHash) {
+                return;
+            }
+            history.replaceState(null, "", targetHash);
+        });
+    });
+
+    window.addEventListener("hashchange", requestorActivateTabFromHash);
+    requestorActivateTabFromHash();
+}
+
 function initializeRequestorRecruitmentPortal() {
     if (!requestorPortalElements.form) {
         return;
@@ -1004,6 +1038,7 @@ function initializeRequestorRecruitmentPortal() {
 
     requestorBindToolbarEvents();
     requestorBindFormEvents();
+    requestorBindTabHashSync();
 }
 
 initializeRequestorRecruitmentPortal();

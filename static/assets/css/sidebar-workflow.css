@@ -1,0 +1,77 @@
+.sidebar-nav .sidebar-link.workflow-parent {
+  border: 1px solid rgba(13, 110, 253, 0.18);
+  border-radius: 10px;
+  margin-top: 4px;
+  margin-bottom: 6px;
+  padding: 11px 14px;
+  font-weight: 600;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.sidebar-nav .sidebar-link.workflow-parent:hover {
+  border-color: rgba(13, 110, 253, 0.32);
+}
+
+.sidebar-nav .sidebar-item.selected > .sidebar-link.workflow-parent,
+.sidebar-nav .sidebar-item > .sidebar-link.workflow-parent.active {
+  background: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary);
+  border-color: rgba(13, 110, 253, 0.35);
+}
+
+.sidebar-nav .workflow-submenu {
+  margin: 0 0 12px 14px;
+  padding-left: 12px;
+  border-left: 1px dashed rgba(108, 117, 125, 0.4);
+}
+
+.sidebar-nav .workflow-submenu .sidebar-item > .sidebar-link {
+  padding: 7px 10px;
+  border-radius: 8px;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.sidebar-nav .workflow-submenu .sidebar-item > .sidebar-link .ti {
+  font-size: 7px;
+  color: #8a97a4;
+}
+
+.sidebar-nav .workflow-submenu .sidebar-item > .sidebar-link:hover {
+  background: rgba(13, 110, 253, 0.08);
+}
+
+.sidebar-nav .workflow-submenu .sidebar-item > .sidebar-link.active {
+  background: rgba(13, 110, 253, 0.14);
+  color: var(--bs-primary);
+  font-weight: 600;
+}
+
+.sidebar-nav .sidebar-link.workflow-parent.has-arrow::before {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: rgba(13, 110, 253, 0.08);
+}
+
+.sidebar-nav .sidebar-link.workflow-parent.has-arrow::after {
+  right: 16px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: 0;
+  border-width: 2px 2px 0 0;
+  border-color: currentColor;
+  transform: translateY(-50%) rotate(135deg);
+}
+
+.sidebar-nav .sidebar-item.selected > .sidebar-link.workflow-parent.has-arrow::after,
+.sidebar-nav .sidebar-link.workflow-parent.has-arrow[aria-expanded="true"]::after {
+  border-color: var(--bs-primary);
+  transform: translateY(-50%) rotate(-45deg);
+}

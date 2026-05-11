@@ -154,6 +154,16 @@ def _build_recruitment_lookup_options():
 
 @hr_portal_required
 def recruitment_management(request):
+    allowed_pages = {
+        "hiring-requests",
+        "hiring-approvals",
+        "job-postings",
+        "job-posting-approvals",
+    }
+    active_recruitment_page = request.GET.get("page", "hiring-requests")
+    if active_recruitment_page not in allowed_pages:
+        active_recruitment_page = "hiring-requests"
+
     hiring_requests, hiring_request_approvals, job_postings, job_posting_approvals = _get_recruitment_scope(
         request.user
     )
@@ -168,6 +178,7 @@ def recruitment_management(request):
         "live_job_postings": job_postings.filter(status=JobPosting.Status.PUBLISHED).count(),
         "can_create_hiring_requests": bool(available_requestor_roles),
         "can_manage_job_postings": can_access_hr_portal(request.user),
+        "active_recruitment_page": active_recruitment_page,
         "recruitment_permissions": {
             "username": request.user.username,
             "is_hr": can_access_hr_portal(request.user),

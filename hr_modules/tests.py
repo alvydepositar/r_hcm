@@ -130,9 +130,31 @@ class RecruitmentManagementPageTests(TestCase):
         response = self.client.get(reverse("recruitment_management"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Recruitment Workspace")
+        self.assertContains(response, "Recruitment Portal")
         self.assertContains(response, "recruitment-hiring-requests-table")
         self.assertContains(response, "js/hr/recruitment/recruitment_management.js")
+        self.assertContains(response, 'id="hr-admin-nav" style="display: none;"')
+        self.assertEqual(response.context["active_recruitment_page"], "hiring-requests")
+
+    def test_hr_user_can_open_recruitment_hiring_approvals_page(self):
+        self.client.force_login(self.hr_user)
+
+        response = self.client.get(f"{reverse('recruitment_management')}?page=hiring-approvals")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "recruitment-hiring-approvals-table")
+        self.assertNotContains(response, "recruitment-hiring-requests-table")
+        self.assertEqual(response.context["active_recruitment_page"], "hiring-approvals")
+
+    def test_invalid_recruitment_page_defaults_to_hiring_requests(self):
+        self.client.force_login(self.hr_user)
+
+        response = self.client.get(f"{reverse('recruitment_management')}?page=invalid-page")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "recruitment-hiring-requests-table")
+        self.assertNotContains(response, "recruitment-hiring-approvals-table")
+        self.assertEqual(response.context["active_recruitment_page"], "hiring-requests")
 
     def test_it_manager_cannot_open_recruitment_workspace(self):
         self.client.force_login(self.it_user)
@@ -177,6 +199,7 @@ class RecruitmentManagementPageTests(TestCase):
         self.assertContains(response, "Requestor Recruitment Portal")
         self.assertContains(response, "js/employee/recruitment_portal.js")
         self.assertFalse(response.context["requestor_recruitment_permissions"]["can_create_hiring_requests"])
+        self.assertContains(response, 'id="employee-nav" style="display: none;"')
 
     def test_regular_employee_cannot_open_recruitment_requestor_portal(self):
         self.client.force_login(self.employee_user)

@@ -8,6 +8,7 @@
   <title>HCM</title>
   <link rel="shortcut icon" type="image/png" href="{% static 'images/logos/favicon.png' %}" />
   <link rel="stylesheet" href="{% static 'css/styles.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'css/sidebar-workflow.css' %}" />
   <link href="https://unpkg.com/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/tabulator-theme.css' %}" />
   {% block extra_head %}{% endblock %}
@@ -33,9 +34,10 @@
         <!-- Sidebar navigation-->
         <nav class="sidebar-nav scroll-sidebar" data-simplebar="">
           <ul id="sidebarnav">
+            <!-- SHARED NAVIGATION -->
             <li class="nav-small-cap">
               <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-              <span class="hide-menu">Home</span>
+              <span class="hide-menu">Menu</span>
             </li>
             <li class="sidebar-item">
               <a class="sidebar-link" href="{% if portal_mode == 'employee' %}{% url 'index' %}?portal=employee{% else %}{% url 'index' %}{% endif %}" aria-expanded="false" id="sidebar-dashboard-link">
@@ -43,89 +45,352 @@
                 <span class="hide-menu">Dashboard</span>
               </a>
             </li>
-            <!-- ---------------------------------- -->
-            <!-- Dashboard -->
-            <!-- ---------------------------------- -->
 
             <li>
               <span class="sidebar-divider lg"></span>
             </li>
 
-            <!-- HR/Admin Navigation-->
+            <!-- HR ADMIN PORTAL NAVIGATION -->
             {% if can_access_hr_portal %}
-            <div id="hr-admin-nav" {% if portal_mode == 'employee' %}style="display: none;"{% endif %}>
+            <div id="hr-admin-nav" {% if portal_mode == 'employee' or is_recruitment_portal %}style="display: none;"{% endif %}>
               <li class="nav-small-cap">
                 <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-                <span class="hide-menu">HCM Management</span>
+                <span class="hide-menu">HR Workflows</span>
               </li>
-              <!-- Employee Management -->
+
+              <!-- People Management -->
               <li class="sidebar-item">
-                <a class="sidebar-link" href="{% url 'employee_management' %}" aria-expanded="false">
-                  <i class="ti ti-users"></i>
-                  <span class="hide-menu">Employee Management</span>
+                <a class="sidebar-link justify-content-between has-arrow workflow-parent" href="javascript:void(0)" aria-expanded="false">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="d-flex">
+                      <i class="ti ti-users"></i>
+                    </span>
+                    <span class="hide-menu">People Management</span>
+                  </div>
                 </a>
+                <ul aria-expanded="false" class="collapse first-level workflow-submenu">
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'employee_management' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Overview</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'employee_info' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Employee Information</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'personal_data_sheet' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Personal Data Sheet</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'divisions' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Divisions</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'positions' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Positions</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'salary_grades' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Salary Grades</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'csc_plantilla' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">CSC Plantilla</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'approvers' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Approvers</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'access_rights' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Access Rights</span>
+                      </div>
+                    </a>
+                  </li>
+                </ul>
               </li>
-              <!-- Leave Management -->
+
+              <!-- Time & Attendance -->
               <li class="sidebar-item">
-                <a class="sidebar-link" href="{% url 'leave_management' %}" aria-expanded="false">
-                  <i class="ti ti-file-text"></i>
-                  <span class="hide-menu">Leave Management</span>
+                <a class="sidebar-link justify-content-between has-arrow workflow-parent" href="javascript:void(0)" aria-expanded="false">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="d-flex">
+                      <i class="ti ti-clock"></i>
+                    </span>
+                    <span class="hide-menu">Time &amp; Attendance</span>
+                  </div>
                 </a>
+                <ul aria-expanded="false" class="collapse first-level workflow-submenu">
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'leave_management' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Overview</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'leave_applications' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Leave Applications</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'leave_types' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Leave Types</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'employee_leave_credits' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Leave Credits</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'time_rules' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Time Rules</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'oba_management' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Official Business</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'cc_management' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Clock Correction</span>
+                      </div>
+                    </a>
+                  </li>
+                </ul>
               </li>
-              <!-- Official Business Management -->
+
+              {% if can_access_recruitment %}
+              <!-- Recruitment -->
               <li class="sidebar-item">
-                <a class="sidebar-link" href="{% url 'oba_management' %}" aria-expanded="false">
-                  <i class="ti ti-file"></i>
-                  <span class="hide-menu">OBA Management</span>
+                <a class="sidebar-link justify-content-between has-arrow workflow-parent" href="javascript:void(0)" aria-expanded="false">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="d-flex">
+                      <i class="ti ti-briefcase"></i>
+                    </span>
+                    <span class="hide-menu">Recruitment</span>
+                  </div>
                 </a>
-              </li>
-              <!-- Clock Management -->
-              <li class="sidebar-item">
-                <a class="sidebar-link" href="{% url 'cc_management' %}" aria-expanded="false">
-                  <i class="ti ti-clock"></i>
-                  <span class="hide-menu">Time Correction</span>
-                </a>
-              </li>
-            </div>
-            {% endif %}
-            {% if can_access_recruitment %}
-            <li class="nav-small-cap mt-4">
-              <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-              <span class="hide-menu">Recruitment</span>
-            </li>
-              <li class="sidebar-item">
-                <a class="sidebar-link" href="{% url 'recruitment_management' %}" aria-expanded="false">
-                  <i class="ti ti-briefcase"></i>
-                  <span class="hide-menu">Recruitment Portal</span>
-                </a>
+                <ul aria-expanded="false" class="collapse first-level workflow-submenu">
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_management' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Overview</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_management' %}?page=hiring-requests">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Hiring Requests</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_management' %}?page=hiring-approvals">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Hiring Approvals</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_management' %}?page=job-postings">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Job Postings</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_management' %}?page=job-posting-approvals">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Posting Approvals</span>
+                      </div>
+                    </a>
+                  </li>
+                </ul>
               </li>
               {% endif %}
+            </div>
+            {% endif %}
 
-            {% if can_access_recruitment and not can_access_hr_portal %}
-            <div id="recruitment-nav" {% if portal_mode == 'employee' %}style="display: none;"{% endif %}>
+            {% if can_access_recruitment_requestor and not can_access_hr_portal %}
+            <li>
+              <span class="sidebar-divider lg"></span>
+            </li>
+            <div id="recruitment-nav" {% if portal_mode == 'employee' and not is_recruitment_portal %}style="display: none;"{% endif %}>
               <li class="nav-small-cap">
                 <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-                <span class="hide-menu">Recruitment</span>
+                <span class="hide-menu">Workflows</span>
               </li>
               <li class="sidebar-item">
-                <a class="sidebar-link" href="{% url 'recruitment_requestor_portal' %}" aria-expanded="false">
-                  <i class="ti ti-briefcase"></i>
-                  <span class="hide-menu">Recruitment Portal</span>
+                <a class="sidebar-link justify-content-between has-arrow workflow-parent" href="javascript:void(0)" aria-expanded="false">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="d-flex">
+                      <i class="ti ti-briefcase"></i>
+                    </span>
+                    <span class="hide-menu">Recruitment</span>
+                  </div>
                 </a>
+                <ul aria-expanded="false" class="collapse first-level workflow-submenu">
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_requestor_portal' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Overview</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_requestor_portal' %}#requestor-my-requests-pane">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">My Requests</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_requestor_portal' %}#requestor-hiring-approvals-pane">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Hiring Approvals</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_requestor_portal' %}#requestor-job-posting-reviews-pane">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Posting Reviews</span>
+                      </div>
+                    </a>
+                  </li>
+                </ul>
               </li>
             </div>
             {% endif %}
 
-            <!-- Employee/Approver Navigation-->
+            <!-- EMPLOYEE PORTAL NAVIGATION -->
             {% if can_access_employee_portal %}
-            <div id="employee-nav" {% if portal_mode != 'employee' %}style="display: none;"{% endif %}>
+            <li>
+              <span class="sidebar-divider lg"></span>
+            </li>
+            <div id="employee-nav" {% if portal_mode != 'employee' or is_recruitment_portal %}style="display: none;"{% endif %}>
               <li class="nav-small-cap">
                 <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-                <span class="hide-menu">Filings</span>
+                <span class="hide-menu">Time &amp; Attendance</span>
               </li>
               <!-- Leave Request -->
               <li class="sidebar-item">
-                <a class="sidebar-link justify-content-between has-arrow" href="javascript:void(0)" aria-expanded="false">
+                <a class="sidebar-link justify-content-between has-arrow workflow-parent" href="javascript:void(0)" aria-expanded="false">
                   <div class="d-flex align-items-center gap-3">
                     <span class="d-flex">
                       <i class="ti ti-file-text"></i>
@@ -133,7 +398,7 @@
                     <span class="hide-menu">Leave Request</span>
                   </div>
                 </a>
-                <ul aria-expanded="false" class="collapse first-level">
+                <ul aria-expanded="false" class="collapse first-level workflow-submenu">
                   <li class="sidebar-item">
                     <a class="sidebar-link justify-content-between"
                       href="{% url 'employee_leave_portal' %}?portal=employee">
@@ -173,7 +438,7 @@
               </li>
               <!-- Official Business -->
               <li class="sidebar-item">
-                <a class="sidebar-link justify-content-between has-arrow" href="javascript:void(0)" aria-expanded="false">
+                <a class="sidebar-link justify-content-between has-arrow workflow-parent" href="javascript:void(0)" aria-expanded="false">
                   <div class="d-flex align-items-center gap-3">
                     <span class="d-flex">
                       <i class="ti ti-file"></i>
@@ -181,7 +446,7 @@
                     <span class="hide-menu">Official Business</span>
                   </div>
                 </a>
-                <ul aria-expanded="false" class="collapse first-level">
+                <ul aria-expanded="false" class="collapse first-level workflow-submenu">
                   <li class="sidebar-item">
                     <a class="sidebar-link justify-content-between" target="_blank"
                       href="#">
@@ -219,7 +484,7 @@
               </li>
               <!-- Clock Correction -->
               <li class="sidebar-item">
-                <a class="sidebar-link justify-content-between has-arrow" href="javascript:void(0)" aria-expanded="false">
+                <a class="sidebar-link justify-content-between has-arrow workflow-parent" href="javascript:void(0)" aria-expanded="false">
                   <div class="d-flex align-items-center gap-3">
                     <span class="d-flex">
                       <i class="ti ti-clock"></i>
@@ -227,7 +492,7 @@
                     <span class="hide-menu">Clock Correction</span>
                   </div>
                 </a>
-                <ul aria-expanded="false" class="collapse first-level">
+                <ul aria-expanded="false" class="collapse first-level workflow-submenu">
                   <li class="sidebar-item">
                     <a class="sidebar-link justify-content-between" target="_blank"
                       href="#">
@@ -265,21 +530,73 @@
               </li>
 
               {% if can_access_recruitment_requestor %}
+              <li>
+                <span class="sidebar-divider"></span>
+              </li>
               <li class="nav-small-cap">
                 <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
                 <span class="hide-menu">Recruitment</span>
               </li>
               <li class="sidebar-item">
-                <a class="sidebar-link" href="{% url 'recruitment_requestor_portal' %}" aria-expanded="false">
-                  <i class="ti ti-briefcase"></i>
-                  <span class="hide-menu">Recruitment Portal</span>
+                <a class="sidebar-link justify-content-between has-arrow workflow-parent" href="javascript:void(0)" aria-expanded="false">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="d-flex">
+                      <i class="ti ti-briefcase"></i>
+                    </span>
+                    <span class="hide-menu">Recruitment Portal</span>
+                  </div>
                 </a>
+                <ul aria-expanded="false" class="collapse first-level workflow-submenu">
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_requestor_portal' %}">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Overview</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_requestor_portal' %}#requestor-my-requests-pane">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">My Requests</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_requestor_portal' %}#requestor-hiring-approvals-pane">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Hiring Approvals</span>
+                      </div>
+                    </a>
+                  </li>
+                  <li class="sidebar-item">
+                    <a class="sidebar-link justify-content-between" href="{% url 'recruitment_requestor_portal' %}#requestor-job-posting-reviews-pane">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Posting Reviews</span>
+                      </div>
+                    </a>
+                  </li>
+                </ul>
               </li>
               {% endif %}
 
+              <li>
+                <span class="sidebar-divider"></span>
+              </li>
               <li class="nav-small-cap">
                 <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-                <span class="hide-menu">Other</span>
+                <span class="hide-menu">Resources</span>
               </li>
               <!-- Training -->
               <li class="sidebar-item">
@@ -334,7 +651,7 @@
           </ul>
           <div class="navbar-collapse justify-content-end px-0" id="navbarNav">
             <ul class="navbar-nav flex-row ms-auto align-items-center justify-content-end">
-              {% if can_access_hr_portal and can_access_employee_portal %}
+              {% if can_access_hr_portal and can_access_employee_portal and not is_recruitment_portal %}
               <li class="nav-item me-2">
                 <a
                   class="btn btn-outline-primary btn-sm text-nowrap"

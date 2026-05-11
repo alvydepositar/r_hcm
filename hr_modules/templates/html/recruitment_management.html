@@ -4,11 +4,11 @@
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item">
-                <a href="{% url 'index' %}" class="text-decoration-none text-primary">
-                    <i class="bi bi-arrow-left-short"></i> Dashboard
+                <a href="{% url 'employee_management' %}" class="text-decoration-none text-primary">
+                    <i class="bi bi-arrow-left-short"></i> People Management
                 </a>
             </li>
-            <li class="breadcrumb-item active" aria-current="page">Recruitment Workspace</li>
+            <li class="breadcrumb-item active" aria-current="page">Recruitment Portal</li>
         </ol>
     </nav>
 {% endblock %}
@@ -20,7 +20,7 @@
                 <div class="card-body">
                     <div class="small text-uppercase text-muted fw-semibold mb-2">Hiring Requests</div>
                     <h3 class="fw-semibold mb-1">{{ total_hiring_requests }}</h3>
-                    <p class="text-muted mb-0">Requests visible in your recruitment workspace.</p>
+                    <p class="text-muted mb-0">Requests visible in your recruitment portal.</p>
                 </div>
             </div>
         </div>
@@ -57,12 +57,15 @@
         <div class="card-body">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
                 <div>
-                    <h5 class="card-title mb-1">Recruitment Workspace</h5>
+                    <h5 class="card-title mb-1">Recruitment Portal</h5>
                     <p class="text-muted mb-0">
-                        Manage hiring requests, approval queues, job posting preparation, and publication to the applicant portal from one screen.
+                        Manage hiring requests, approval queues, job posting preparation, and publication to the applicant portal from this portal.
                     </p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
+                    <a href="{% url 'employee_management' %}" class="btn btn-outline-secondary">
+                        <i class="ti ti-arrow-left"></i> Back to People Management
+                    </a>
                     {% if can_create_hiring_requests %}
                     <button id="add-hiring-request-btn" type="button" class="btn btn-primary">
                         <i class="ti ti-plus"></i> New Hiring Request
@@ -83,62 +86,74 @@
                 </div>
             </div>
 
-            <ul class="nav nav-underline w-100" id="recruitmentTabs" role="tablist">
-                <li class="nav-item flex-grow-1 text-center" role="presentation">
-                    <button class="nav-link active w-100" id="hiring-requests-tab" data-bs-toggle="tab" data-bs-target="#hiring-requests-pane" type="button" role="tab" aria-controls="hiring-requests-pane" aria-selected="true">Hiring Requests</button>
-                </li>
-                <li class="nav-item flex-grow-1 text-center" role="presentation">
-                    <button class="nav-link w-100" id="hiring-approvals-tab" data-bs-toggle="tab" data-bs-target="#hiring-approvals-pane" type="button" role="tab" aria-controls="hiring-approvals-pane" aria-selected="false">Hiring Approvals</button>
-                </li>
-                <li class="nav-item flex-grow-1 text-center" role="presentation">
-                    <button class="nav-link w-100" id="job-postings-tab" data-bs-toggle="tab" data-bs-target="#job-postings-pane" type="button" role="tab" aria-controls="job-postings-pane" aria-selected="false">Job Postings</button>
-                </li>
-                <li class="nav-item flex-grow-1 text-center" role="presentation">
-                    <button class="nav-link w-100" id="job-posting-approvals-tab" data-bs-toggle="tab" data-bs-target="#job-posting-approvals-pane" type="button" role="tab" aria-controls="job-posting-approvals-pane" aria-selected="false">Posting Approvals</button>
-                </li>
-            </ul>
-
-            <div class="tab-content mt-4">
-                <div class="tab-pane fade show active" id="hiring-requests-pane" role="tabpanel" aria-labelledby="hiring-requests-tab">
-                    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
-                        <input type="text" class="form-control" id="hiring-requests-search" placeholder="Search hiring requests..." style="max-width: 320px;">
-                        <button id="refresh-hiring-requests-btn" type="button" class="btn btn-outline-secondary btn-sm">
-                            <i class="ti ti-refresh"></i> Refresh
-                        </button>
-                    </div>
-                    <div id="recruitment-hiring-requests-table"></div>
-                </div>
-
-                <div class="tab-pane fade" id="hiring-approvals-pane" role="tabpanel" aria-labelledby="hiring-approvals-tab">
-                    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
-                        <input type="text" class="form-control" id="hiring-approvals-search" placeholder="Search hiring approvals..." style="max-width: 320px;">
-                        <button id="refresh-hiring-approvals-btn" type="button" class="btn btn-outline-secondary btn-sm">
-                            <i class="ti ti-refresh"></i> Refresh
-                        </button>
-                    </div>
-                    <div id="recruitment-hiring-approvals-table"></div>
-                </div>
-
-                <div class="tab-pane fade" id="job-postings-pane" role="tabpanel" aria-labelledby="job-postings-tab">
-                    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
-                        <input type="text" class="form-control" id="job-postings-search" placeholder="Search job postings..." style="max-width: 320px;">
-                        <button id="refresh-job-postings-btn" type="button" class="btn btn-outline-secondary btn-sm">
-                            <i class="ti ti-refresh"></i> Refresh
-                        </button>
-                    </div>
-                    <div id="recruitment-job-postings-table"></div>
-                </div>
-
-                <div class="tab-pane fade" id="job-posting-approvals-pane" role="tabpanel" aria-labelledby="job-posting-approvals-tab">
-                    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
-                        <input type="text" class="form-control" id="job-posting-approvals-search" placeholder="Search posting approvals..." style="max-width: 320px;">
-                        <button id="refresh-job-posting-approvals-btn" type="button" class="btn btn-outline-secondary btn-sm">
-                            <i class="ti ti-refresh"></i> Refresh
-                        </button>
-                    </div>
-                    <div id="recruitment-job-posting-approvals-table"></div>
-                </div>
+            <div class="d-flex flex-wrap gap-2 mb-4">
+                <a
+                    href="{% url 'recruitment_management' %}?page=hiring-requests"
+                    class="btn {% if active_recruitment_page == 'hiring-requests' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                >
+                    Hiring Requests
+                </a>
+                <a
+                    href="{% url 'recruitment_management' %}?page=hiring-approvals"
+                    class="btn {% if active_recruitment_page == 'hiring-approvals' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                >
+                    Hiring Approvals
+                </a>
+                <a
+                    href="{% url 'recruitment_management' %}?page=job-postings"
+                    class="btn {% if active_recruitment_page == 'job-postings' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                >
+                    Job Postings
+                </a>
+                <a
+                    href="{% url 'recruitment_management' %}?page=job-posting-approvals"
+                    class="btn {% if active_recruitment_page == 'job-posting-approvals' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                >
+                    Posting Approvals
+                </a>
             </div>
+
+            {% if active_recruitment_page == "hiring-requests" %}
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                    <input type="text" class="form-control" id="hiring-requests-search" placeholder="Search hiring requests..." style="max-width: 320px;">
+                    <button id="refresh-hiring-requests-btn" type="button" class="btn btn-outline-secondary btn-sm">
+                        <i class="ti ti-refresh"></i> Refresh
+                    </button>
+                </div>
+                <div id="recruitment-hiring-requests-table"></div>
+            </div>
+            {% elif active_recruitment_page == "hiring-approvals" %}
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                    <input type="text" class="form-control" id="hiring-approvals-search" placeholder="Search hiring approvals..." style="max-width: 320px;">
+                    <button id="refresh-hiring-approvals-btn" type="button" class="btn btn-outline-secondary btn-sm">
+                        <i class="ti ti-refresh"></i> Refresh
+                    </button>
+                </div>
+                <div id="recruitment-hiring-approvals-table"></div>
+            </div>
+            {% elif active_recruitment_page == "job-postings" %}
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                    <input type="text" class="form-control" id="job-postings-search" placeholder="Search job postings..." style="max-width: 320px;">
+                    <button id="refresh-job-postings-btn" type="button" class="btn btn-outline-secondary btn-sm">
+                        <i class="ti ti-refresh"></i> Refresh
+                    </button>
+                </div>
+                <div id="recruitment-job-postings-table"></div>
+            </div>
+            {% elif active_recruitment_page == "job-posting-approvals" %}
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                    <input type="text" class="form-control" id="job-posting-approvals-search" placeholder="Search posting approvals..." style="max-width: 320px;">
+                    <button id="refresh-job-posting-approvals-btn" type="button" class="btn btn-outline-secondary btn-sm">
+                        <i class="ti ti-refresh"></i> Refresh
+                    </button>
+                </div>
+                <div id="recruitment-job-posting-approvals-table"></div>
+            </div>
+            {% endif %}
         </div>
     </div>
 

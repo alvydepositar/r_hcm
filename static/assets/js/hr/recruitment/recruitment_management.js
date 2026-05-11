@@ -979,15 +979,25 @@ function initRecruitmentWorkspace() {
     populateLookupSelects();
     bindLookupEvents();
 
-    createHiringRequestsTable();
-    createHiringApprovalsTable();
-    createJobPostingsTable();
-    createJobPostingApprovalsTable();
+    if (document.getElementById("recruitment-hiring-requests-table")) {
+        createHiringRequestsTable();
+        bindTableSearch("hiring-requests-search", hiringRequestsTable);
+    }
 
-    bindTableSearch("hiring-requests-search", hiringRequestsTable);
-    bindTableSearch("hiring-approvals-search", hiringRequestApprovalsTable);
-    bindTableSearch("job-postings-search", jobPostingsTable);
-    bindTableSearch("job-posting-approvals-search", jobPostingApprovalsTable);
+    if (document.getElementById("recruitment-hiring-approvals-table")) {
+        createHiringApprovalsTable();
+        bindTableSearch("hiring-approvals-search", hiringRequestApprovalsTable);
+    }
+
+    if (document.getElementById("recruitment-job-postings-table")) {
+        createJobPostingsTable();
+        bindTableSearch("job-postings-search", jobPostingsTable);
+    }
+
+    if (document.getElementById("recruitment-job-posting-approvals-table")) {
+        createJobPostingApprovalsTable();
+        bindTableSearch("job-posting-approvals-search", jobPostingApprovalsTable);
+    }
 
     bindToolbarEvents();
     bindFormEvents();

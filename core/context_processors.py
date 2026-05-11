@@ -14,6 +14,12 @@ def portal_access(request):
     user = request.user
     employee = get_user_employee(user)
     portal_mode = resolve_portal_mode(request) if getattr(user, "is_authenticated", False) else None
+    resolver_match = getattr(request, "resolver_match", None)
+    current_route_name = getattr(resolver_match, "url_name", "") if resolver_match else ""
+    is_recruitment_portal = current_route_name in {
+        "recruitment_management",
+        "recruitment_requestor_portal",
+    }
 
     employee_data = None
     if employee is not None:
@@ -30,6 +36,7 @@ def portal_access(request):
 
     return {
         "portal_mode": portal_mode,
+        "is_recruitment_portal": is_recruitment_portal,
         "can_access_hr_portal": can_access_hr_portal(user),
         "can_access_employee_portal": can_access_employee_portal(user),
         "can_access_approval_queue": can_access_approval_queue(user),
@@ -39,6 +46,7 @@ def portal_access(request):
         "portal_role_names": get_role_names(user),
         "portal_context_data": {
             "portal_mode": portal_mode,
+            "is_recruitment_portal": is_recruitment_portal,
             "can_access_hr_portal": can_access_hr_portal(user),
             "can_access_employee_portal": can_access_employee_portal(user),
             "can_access_approval_queue": can_access_approval_queue(user),
